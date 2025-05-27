@@ -1,0 +1,222 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                String        @id @default(auto()) @map("_id") @db.ObjectId
+  fullName          String
+  email             String        @unique
+  profileImage      String?
+  phoneNumber       String?
+  address           String?
+  expirationOtp     DateTime?
+  otp               Int?
+  password          String
+  isApproved        Boolean       @default(false)
+  role              UserRole      @default(USER)
+  status            UserStatus    @default(ACTIVE)
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  businesses        Business[]    @relation("UserBusinesses")
+  favorites         favorite[]    @relation("UserFavorites")
+  bookings          Booking[]     @relation("UserBookings")
+  reviews           Review[]      @relation("UserReviews")
+  @@map("users")
+}
+
+model Category {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  name        String   @unique
+  image String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  subCategories SubCategory[] @relation("CategorySubCategories")
+  businesses    Business[]    @relation("CategoryBusinesses")
+  @@map("categories")
+}
+
+model SubCategory {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  name        String   @unique
+  categoryId  String   @db.ObjectId
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  category    Category @relation("CategorySubCategories",fields: [categoryId], references: [id])
+  businesses  Business[] @relation("SubCategoryBusinesses")
+  @@map("subcategories")
+}
+
+model Business {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  name        String
+  description String?
+  image       String?
+  categoryId  String   @db.ObjectId
+  subCategoryId String? @db.ObjectId
+  latitude   Float?
+  longitude  Float?
+  address     String?
+  openingHours String
+  closingHours String
+  status       BusinessStatus @default(PENDING)
+  openStatus  BusinessTimeStatus @default(CLOSED)
+  userId      String   @db.ObjectId
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  category    Category? @relation("CategoryBusinesses",fields: [categoryId], references: [id])
+  subCategory SubCategory? @relation("SubCategoryBusinesses",fields: [subCategoryId], references: [id])
+  user        User      @relation("UserBusinesses",fields: [userId], references: [id])
+  services    Service[] @relation("BusinessServices")
+  specialists Specialist[] @relation("BusinessSpecialists")
+  bookings    Booking[] @relation("BusinessBookings")
+  schedules   Schedule[] @relation("BusinessSchedules")
+  @@map("businesses")
+}
+
+model Service {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  name        String
+  description String?  @default("")
+  price       Float
+  image       String?
+  isActive    Boolean  @default(true)
+  isOffered   Boolean  @default(false)
+  offeredPercent Int? @default(0)
+  businessId  String   @db.ObjectId
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  business    Business @relation("BusinessServices",fields: [businessId], references: [id])
+  favorites   favorite[] @relation("ServiceFavorites")
+  specialists Specialist[] @relation("ServiceSpecialists")
+  bookings    Booking[] @relation("ServiceBookings")
+  schedules   Schedule[] @relation("ServiceSchedules")
+  @@map("services")
+}
+
+model favorite {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId      String   @db.ObjectId
+  serviceId  String  @db.ObjectId
+  isFavorite  Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user        User     @relation("UserFavorites",fields: [userId], references: [id])
+  service     Service  @relation("ServiceFavorites",fields: [serviceId], references: [id])
+  @@map("favorites")
+}
+
+model Specialist {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  businessId  String   @db.ObjectId
+  serviceId   String  @db.ObjectId
+  fullName    String
+  phoneNumber String?  @default("")
+  profileImage String? @default("")
+  specialization String
+  status      UserStatus @default(ACTIVE)
+  experience Int? @default(0)
+  totalRating Int? @default(0)
+  totalWorks Int? @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  business    Business @relation("BusinessSpecialists",fields: [businessId], references: [id])
+  service     Service @relation("ServiceSpecialists",fields: [serviceId], references: [id])
+  bookings    Booking[] @relation("SpecialistBookings")
+  reviews     Review[] @relation("SpecialistReviews")
+  @@map("specialists")
+}
+
+model Schedule {
+  id              String            @id @default(auto()) @map("_id") @db.ObjectId
+  businessId      String            @db.ObjectId
+  serviceId       String            @db.ObjectId
+  startDateTime   DateTime
+  endDateTime     DateTime
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  
+  bookings         Booking[]         @relation("ScheduleBookings")
+  business        Business          @relation("BusinessSchedules",fields: [businessId], references: [id])
+  service        Service           @relation("ServiceSchedules",fields: [serviceId], references: [id])
+
+  @@map("schedules")
+}
+
+model Booking {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId      String   @db.ObjectId
+  businessId  String   @db.ObjectId
+  serviceId   String   @db.ObjectId
+  specialistId String @db.ObjectId
+  bookingDate DateTime
+  scheduleId  String @db.ObjectId
+  totalPrice Float
+  paymentStatus Boolean @default(false)
+  status      UserStatus @default(ACTIVE)
+  bookingStatus bookingStatus @default(PENDING)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user        User     @relation("UserBookings",fields: [userId], references: [id])
+  business    Business @relation("BusinessBookings",fields: [businessId], references: [id])
+  service     Service  @relation("ServiceBookings",fields: [serviceId], references: [id])
+  specialist Specialist @relation("SpecialistBookings",fields: [specialistId], references: [id])
+  schedule    Schedule @relation("ScheduleBookings",fields: [scheduleId], references: [id])
+  @@map("bookings")
+}
+
+model Review {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId      String   @db.ObjectId
+  specialistId String? @db.ObjectId
+  rating      Int
+  comment     String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user        User     @relation("UserReviews",fields: [userId], references: [id])
+  specialist Specialist? @relation("SpecialistReviews",fields: [specialistId], references: [id])
+  
+  @@map("reviews")
+}
+
+enum UserRole {
+  ADMIN
+  SUPER_ADMIN
+  PROFESSIONAL
+  USER
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  BLOCKED
+}
+
+enum BusinessStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+}
+enum BusinessTimeStatus {
+  OPEN
+  CLOSED
+}
+enum bookingStatus {
+  PENDING
+  COMPLETE_REQUEST
+  COMPLETED
+  CANCELLED
+}
