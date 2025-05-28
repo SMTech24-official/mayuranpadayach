@@ -3,6 +3,8 @@ import { userRoutes } from "../modules/User/user.route";
 import { AuthRoutes } from "../modules/Auth/auth.routes";
 import { categoryRoutes } from "../modules/category/category.routes";
 import { subCategoryRoutes } from "../modules/subCategory/subCategory.routes";
+import { subscriptionOfferRoutes } from "../modules/subscriptionOffer/subscriptionOffer.routes";
+import { userSubscriptionRoutes } from "../modules/userSubscription/userSubscription.routes";
 
 
 
@@ -24,6 +26,14 @@ const moduleRoutes = [
   {
     path: "/subCategories",
     route: subCategoryRoutes,
+  },
+  {
+    path: "/subscriptionOffers",
+    route: subscriptionOfferRoutes,
+  },
+  {
+    path: "/userSubscriptions",
+    route: userSubscriptionRoutes,
   }
 ];
 

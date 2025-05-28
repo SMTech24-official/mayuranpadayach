@@ -229,6 +229,8 @@ model SubscriptionOffer {
   title       String
   price       Float   
   duration    Int
+  platformFee    Float
+  features       Json   // for storing feature flags as key-value
   status      UserStatus @default(ACTIVE)
   createdBy   String   @db.ObjectId
   creator     User     @relation("UserRelation",fields: [createdBy], references: [id])
