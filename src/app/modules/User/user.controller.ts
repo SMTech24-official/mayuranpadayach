@@ -33,6 +33,18 @@ const getUsers = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+// get a user by id
+const getUser = catchAsync(async (req: Request, res: Response) => {
+  const id = req.params.id;
+  const result = await userService.getUserFromDb(id);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "User retrieve successfully!",
+    data: result,
+  });
+});
+
 
 // get all user form db
 const updateProfile = catchAsync(async (req: Request & {user?:any}, res: Response) => {
@@ -64,6 +76,7 @@ const id = req.params.id;
 export const userController = {
   createUser,
   getUsers,
+  getUser,
   updateProfile,
   updateUser
 };

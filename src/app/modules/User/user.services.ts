@@ -2,6 +2,7 @@ import prisma from "../../../shared/prisma";
 import ApiError from "../../../errors/ApiErrors";
 import { IUser, IUserFilterRequest } from "./user.interface";
 import * as bcrypt from "bcrypt";
+import crypto from 'crypto';
 import { IPaginationOptions } from "../../../interfaces/paginations";
 import { paginationHelper } from "../../../helpars/paginationHelper";
 import { Prisma, User, UserRole } from "@prisma/client";
@@ -12,49 +13,99 @@ import { Request } from "express";
 import { fileUploader } from "../../../helpars/fileUploader";
 import { Secret } from "jsonwebtoken";
 import { jwtHelpers } from "../../../helpars/jwtHelpers";
+import { generateOtpEmail } from "../../../shared/emaiHTMLtext";
+import emailSender from "../../../shared/emailSender";
 
 // Create a new user in the database.
 const createUserIntoDb = async (payload: User) => {
-  const existingUser = await prisma.user.findFirst({
+ const existingUser = await prisma.user.findFirst({
     where: {
       email: payload.email,
     },
-  });
+  })
+
+  const otp = Number(crypto.randomInt(1000, 9999));
+  const otpExpires = new Date(Date.now() + 10 * 60 * 1000);
 
   if (existingUser) {
-    if (existingUser.email === payload.email) {
-      throw new ApiError(
-        400,
-        `User with this email ${payload.email} already exists`
-      );
+    if (existingUser.status === 'BLOCKED') {
+      throw new ApiError(400, `User with email ${payload.email} is blocked.`);
+    }
+
+    if (existingUser.status === 'ACTIVE') {
+      throw new ApiError(400, `User with email ${payload.email} is already active.`);
+    }
+
+    if (existingUser.status === 'INACTIVE') {
+      const updatedData: Record<string, any> = {
+        status: 'INACTIVE',
+        expirationOtp: otpExpires,
+        otp,
+      };
+
+      if (payload.password) {
+        const hashedPassword = await bcrypt.hash(payload.password, Number(config.bcrypt_salt_rounds));
+        updatedData.password = hashedPassword;
+      }
+
+      if (payload.fcmToken) {
+        updatedData.fcmToken = payload.fcmToken;
+      }
+
+      if (payload.role){
+        updatedData.role = payload.role;
+      }
+
+      await prisma.user.update({
+        where: { id: existingUser.id },
+        data: updatedData,
+      });
+      const html = generateOtpEmail(otp);
+      await emailSender(payload.email, html, 'OTP Verification');
+
+      console.log("otp", otp);
+      return { message: 'An OTP has been sent to your email. Please verify your account.' };
     }
   }
-  const hashedPassword: string = await bcrypt.hash(
-    payload.password,
-    Number(config.bcrypt_salt_rounds)
-  );
 
-  const result = await prisma.user.create({
-    data: { ...payload, password: hashedPassword },
+  if (!payload.password) {
+    throw new ApiError(400, 'Password is required');
+  }
+
+  const hashedPassword = await bcrypt.hash(payload.password, Number(config.bcrypt_salt_rounds));
+
+  const newUser = await prisma.user.create({
+    data:{
+      fullName: payload.fullName,
+      email: payload.email,
+      password: hashedPassword,
+      role: payload.role,
+      status: 'INACTIVE',
+      fcmToken: payload.fcmToken,
+      otp,
+      expirationOtp: otpExpires,
+    },
     select: {
       id: true,
+      fullName: true,
       email: true,
+      profileImage: true,
       role: true,
+      otp: true,
       createdAt: true,
       updatedAt: true,
     },
-  });
-  const token = jwtHelpers.generateToken(
-    {
-      id: result.id,
-      email: result.email,
-      role: result.role,
-    },
-    config.jwt.jwt_secret as Secret,
-    config.jwt.expires_in as string
-  );
+  })
 
-  return { result, token };
+  if (!newUser) {
+    throw new ApiError(500, 'Failed to create user');
+  }
+
+  const html = generateOtpEmail(otp);
+  await emailSender(payload.email, html, 'OTP Verification');
+
+  console.log("otp", otp);
+  return { message: 'An OTP has been sent to your email. Please verify your account.' };
 };
 
 // reterive all users from the database also searcing anf filetering
@@ -105,6 +156,7 @@ const getUsersFromDb = async (
       fullName: true,
       email: true,
       profileImage: true,
+      phoneNumber: true,
       role: true,
       createdAt: true,
       updatedAt: true,
@@ -125,6 +177,31 @@ const getUsersFromDb = async (
     },
     data: result,
   };
+};
+
+//get a user
+const getUserFromDb = async (id: string) => {
+  const user = await prisma.user.findUnique({
+    where: {
+      id,
+    },
+    select: {
+      id: true,
+      fullName: true,
+      email: true,
+      profileImage: true,
+      phoneNumber: true,
+      role: true,
+      createdAt: true,
+      updatedAt: true,
+    },
+  });
+
+  if (!user) {
+    throw new ApiError(404, "User not found");
+  }
+
+  return user;
 };
 
 // update profile by user won profile uisng token or email and id
@@ -154,8 +231,8 @@ const updateProfile = async (req: Request) => {
     },
     data: {
       fullName: parseData.fullName || existingUser.fullName,
-      email: parseData.email || existingUser.email,
       profileImage: image || existingUser.profileImage,
+      phoneNumber: parseData.phoneNumber || existingUser.phoneNumber,
       updatedAt: new Date(), // Assuming your model has an `updatedAt` field
     },
     select: {
@@ -163,6 +240,7 @@ const updateProfile = async (req: Request) => {
       fullName: true,
       email: true,
       profileImage: true,
+      phoneNumber: true,
     },
   });
 
@@ -189,6 +267,7 @@ const updateUserIntoDb = async (payload: IUser, id: string) => {
       fullName: true,
       email: true,
       profileImage: true,
+      phoneNumber: true,
       role: true,
       createdAt: true,
       updatedAt: true,
@@ -209,7 +288,7 @@ const updateUserIntoDb = async (payload: IUser, id: string) => {
 export const userService = {
   createUserIntoDb,
   getUsersFromDb,
+  getUserFromDb,
   updateProfile,
   updateUserIntoDb,
-
 };

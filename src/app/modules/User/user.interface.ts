@@ -3,14 +3,10 @@ import { UserRole, UserStatus } from "@prisma/client";
 export interface IUser {
   id?: string;
   email: string;
-  firstName: string;
-  lastName: string;
+  fullName: string;
   password: string;
   role: UserRole;
-  profession:string;
-  promoCode:string;
   status: UserStatus;
-  isDeleted:boolean;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -18,6 +14,6 @@ export interface IUser {
 export type IUserFilterRequest = {
   name?: string | undefined;
   email?: string | undefined;
-  contactNumber?: string | undefined;
+  phoneNumber?: string | undefined;
   searchTerm?: string | undefined;
 }

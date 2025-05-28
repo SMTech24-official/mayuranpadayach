@@ -15,18 +15,24 @@ router.post(
   userController.createUser
 );
 // *!get all  user
-router.get("/", userController.getUsers);
+router.get("/all", auth(UserRole.ADMIN), userController.getUsers);
+// *!get a user by id
+router.get(
+  "/one/:id",
+  auth(),
+  userController.getUser
+);
 // *!profile user
 router.put(
   "/profile",
   // validateRequest(UserValidation.userUpdateSchema),
 
-  auth(UserRole.ADMIN, UserRole.USER),
+  auth(),
   fileUploader.uploadSingle,
   userController.updateProfile
 );
 
 // *!update  user
-router.put("/:id", userController.updateUser);
+router.put("/:id", auth(UserRole.ADMIN), userController.updateUser);
 
 export const userRoutes = router;

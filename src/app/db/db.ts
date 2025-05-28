@@ -9,6 +9,8 @@ export const initiateSuperAdmin = async () => {
     email: "admin@gmail.com",
     password: hashedPassword,
     role: UserRole.ADMIN,
+    isApproved: true,
+    isAllowed: true,
   };
 
   const isExistUser = await prisma.user.findUnique({

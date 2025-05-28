@@ -11,15 +11,18 @@ model User {
   id                String        @id @default(auto()) @map("_id") @db.ObjectId
   fullName          String        @default("")
   email             String        @unique
+  fcmToken     String?    @default("")
   profileImage      String?       @default("")
   phoneNumber       String?       @default("")
   address           String?       @default("")
-  expirationOtp     DateTime?     @default(now())
-  otp               Int?          @default(0)
+  expirationOtp     DateTime?     
+  otp               Int? 
   password          String
   isApproved        Boolean       @default(false)
   role              UserRole      @default(USER)
   status            UserStatus    @default(ACTIVE)
+  isAllowed       Boolean       @default(false)
+  subscriptionEndsAt     DateTime?
   createdAt         DateTime      @default(now())
   updatedAt         DateTime      @updatedAt
 
@@ -271,7 +274,6 @@ model Notification {
 }
 enum UserRole {
   ADMIN
-  SUPER_ADMIN
   PROFESSIONAL
   USER
 }
