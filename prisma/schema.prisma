@@ -9,13 +9,13 @@ datasource db {
 
 model User {
   id                String        @id @default(auto()) @map("_id") @db.ObjectId
-  fullName          String
+  fullName          String        @default("")
   email             String        @unique
-  profileImage      String?
-  phoneNumber       String?
-  address           String?
-  expirationOtp     DateTime?
-  otp               Int?
+  profileImage      String?       @default("")
+  phoneNumber       String?       @default("")
+  address           String?       @default("")
+  expirationOtp     DateTime?     @default(now())
+  otp               Int?          @default(0)
   password          String
   isApproved        Boolean       @default(false)
   role              UserRole      @default(USER)
@@ -24,16 +24,20 @@ model User {
   updatedAt         DateTime      @updatedAt
 
   businesses        Business[]    @relation("UserBusinesses")
-  favorites         favorite[]    @relation("UserFavorites")
+  favorites         Favorite[]    @relation("UserFavorites")
+  favoriteSpecialists FavoriteSpecialist[] @relation("UserFavoriteSpecialists")
   bookings          Booking[]     @relation("UserBookings")
   reviews           Review[]      @relation("UserReviews")
+  subscriptionOffer   UserSubscription[] @relation("UserRelation")
+  adminSubscription   SubscriptionOffer[] @relation("UserRelation")
+  notifications     Notification[] @relation("UserRelation")
   @@map("users")
 }
 
 model Category {
   id          String   @id @default(auto()) @map("_id") @db.ObjectId
   name        String   @unique
-  image String?
+  image String?    @default("")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -44,7 +48,7 @@ model Category {
 
 model SubCategory {
   id          String   @id @default(auto()) @map("_id") @db.ObjectId
-  name        String   @unique
+  name        String   @default("")
   categoryId  String   @db.ObjectId
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -56,14 +60,15 @@ model SubCategory {
 
 model Business {
   id          String   @id @default(auto()) @map("_id") @db.ObjectId
-  name        String
-  description String?
-  image       String?
+  name        String   @default("")
+  about       String? @default("")
+  contactNumber String? @default("")
+  image       String? @default("")
   categoryId  String   @db.ObjectId
-  subCategoryId String? @db.ObjectId
-  latitude   Float?
-  longitude  Float?
-  address     String?
+  subCategoryId String @db.ObjectId
+  latitude   Float? @default(0)
+  longitude  Float? @default(0)
+  address     String? @default("")
   openingHours String
   closingHours String
   status       BusinessStatus @default(PENDING)
@@ -72,13 +77,13 @@ model Business {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  category    Category? @relation("CategoryBusinesses",fields: [categoryId], references: [id])
-  subCategory SubCategory? @relation("SubCategoryBusinesses",fields: [subCategoryId], references: [id])
+  category    Category @relation("CategoryBusinesses",fields: [categoryId], references: [id])
+  subCategory SubCategory @relation("SubCategoryBusinesses",fields: [subCategoryId], references: [id])
   user        User      @relation("UserBusinesses",fields: [userId], references: [id])
   services    Service[] @relation("BusinessServices")
   specialists Specialist[] @relation("BusinessSpecialists")
   bookings    Booking[] @relation("BusinessBookings")
-  schedules   Schedule[] @relation("BusinessSchedules")
+  portfolios  Portfolio[] @relation("BusinessPortfolios")
   @@map("businesses")
 }
 
@@ -87,7 +92,7 @@ model Service {
   name        String
   description String?  @default("")
   price       Float
-  image       String?
+  image       String @default("")
   isActive    Boolean  @default(true)
   isOffered   Boolean  @default(false)
   offeredPercent Int? @default(0)
@@ -96,14 +101,49 @@ model Service {
   updatedAt   DateTime @updatedAt
 
   business    Business @relation("BusinessServices",fields: [businessId], references: [id])
-  favorites   favorite[] @relation("ServiceFavorites")
+  favorites   Favorite[] @relation("ServiceFavorites")
   specialists Specialist[] @relation("ServiceSpecialists")
   bookings    Booking[] @relation("ServiceBookings")
-  schedules   Schedule[] @relation("ServiceSchedules")
   @@map("services")
 }
 
-model favorite {
+model Specialist {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  businessId  String   @db.ObjectId
+  serviceId   String  @db.ObjectId
+  fullName    String  @default("")
+  phoneNumber String?  @default("")
+  profileImage String? @default("")
+  specialization String @default("")
+  status      UserStatus @default(ACTIVE)
+  experience Int? @default(0)
+  totalRating Int? @default(0)
+  totalWorks Int? @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  business    Business @relation("BusinessSpecialists",fields: [businessId], references: [id])
+  service     Service @relation("ServiceSpecialists",fields: [serviceId], references: [id])
+  bookings    Booking[] @relation("SpecialistBookings")
+  reviews     Review[] @relation("SpecialistReviews")
+  favorites   FavoriteSpecialist[] @relation("ServiceFavoriteSpecialists")
+  portfolios  Portfolio[] @relation("SpecialistPortfolios")
+  @@map("specialists")
+}
+
+model Portfolio{
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  specialistId String  @db.ObjectId
+  image       String   @default("")
+  businessId  String   @db.ObjectId
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  specialist Specialist @relation("SpecialistPortfolios",fields: [specialistId], references: [id])
+  business    Business @relation("BusinessPortfolios",fields: [businessId], references: [id])
+  @@map("portfolios")
+}
+model Favorite {
   id          String   @id @default(auto()) @map("_id") @db.ObjectId
   userId      String   @db.ObjectId
   serviceId  String  @db.ObjectId
@@ -116,43 +156,19 @@ model favorite {
   @@map("favorites")
 }
 
-model Specialist {
+model FavoriteSpecialist {
   id          String   @id @default(auto()) @map("_id") @db.ObjectId
-  businessId  String   @db.ObjectId
-  serviceId   String  @db.ObjectId
-  fullName    String
-  phoneNumber String?  @default("")
-  profileImage String? @default("")
-  specialization String
-  status      UserStatus @default(ACTIVE)
-  experience Int? @default(0)
-  totalRating Int? @default(0)
-  totalWorks Int? @default(0)
+  userId      String   @db.ObjectId
+  specialistId  String  @db.ObjectId
+  isFavorite  Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  business    Business @relation("BusinessSpecialists",fields: [businessId], references: [id])
-  service     Service @relation("ServiceSpecialists",fields: [serviceId], references: [id])
-  bookings    Booking[] @relation("SpecialistBookings")
-  reviews     Review[] @relation("SpecialistReviews")
-  @@map("specialists")
+  user        User     @relation("UserFavoriteSpecialists",fields: [userId], references: [id])
+  specialist  Specialist  @relation("ServiceFavoriteSpecialists",fields: [specialistId], references: [id])
+  @@map("favoriteSpecialists")
 }
 
-model Schedule {
-  id              String            @id @default(auto()) @map("_id") @db.ObjectId
-  businessId      String            @db.ObjectId
-  serviceId       String            @db.ObjectId
-  startDateTime   DateTime
-  endDateTime     DateTime
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
-  
-  bookings         Booking[]         @relation("ScheduleBookings")
-  business        Business          @relation("BusinessSchedules",fields: [businessId], references: [id])
-  service        Service           @relation("ServiceSchedules",fields: [serviceId], references: [id])
-
-  @@map("schedules")
-}
 
 model Booking {
   id          String   @id @default(auto()) @map("_id") @db.ObjectId
@@ -161,7 +177,7 @@ model Booking {
   serviceId   String   @db.ObjectId
   specialistId String @db.ObjectId
   bookingDate DateTime
-  scheduleId  String @db.ObjectId
+  timeSlot    TimeSlot[] @relation("BookingTimeSlots")
   totalPrice Float
   paymentStatus Boolean @default(false)
   status      UserStatus @default(ACTIVE)
@@ -173,16 +189,29 @@ model Booking {
   business    Business @relation("BusinessBookings",fields: [businessId], references: [id])
   service     Service  @relation("ServiceBookings",fields: [serviceId], references: [id])
   specialist Specialist @relation("SpecialistBookings",fields: [specialistId], references: [id])
-  schedule    Schedule @relation("ScheduleBookings",fields: [scheduleId], references: [id])
   @@map("bookings")
+}
+
+model TimeSlot {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  bookingId   String  @db.ObjectId
+  startTime   DateTime
+  endTime     DateTime
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  booking     Booking? @relation("BookingTimeSlots",fields: [bookingId], references: [id])
+  @@unique([startTime, endTime])
+  
+  @@map("timeslots")
 }
 
 model Review {
   id          String   @id @default(auto()) @map("_id") @db.ObjectId
   userId      String   @db.ObjectId
-  specialistId String? @db.ObjectId
+  specialistId String @db.ObjectId
   rating      Int
-  comment     String?
+  comment     String? @default("")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -192,6 +221,54 @@ model Review {
   @@map("reviews")
 }
 
+model SubscriptionOffer {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  title       String
+  price       Float   
+  duration    Int
+  status      UserStatus @default(ACTIVE)
+  createdBy   String   @db.ObjectId
+  creator     User     @relation("UserRelation",fields: [createdBy], references: [id])
+  isDeleted           Boolean        @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  UserSubscription UserSubscription[]
+  
+  @@map("subscription_offers")
+
+}
+
+model UserSubscription {
+  id                  String             @id @default(auto()) @map("_id") @db.ObjectId
+  userId              String             @db.ObjectId
+  subscriptionOfferId String             @db.ObjectId
+  startDate           DateTime           @default(now())
+  endDate             DateTime           @default(now())
+  paymentId           String            @default("")
+  paymentStatus       PaymentStatus      @default(PENDING)
+  status              SubscriptionStatus @default(PENDING)
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+
+  user                User               @relation("UserRelation", fields: [userId], references: [id])
+  subscriptionOffer   SubscriptionOffer  @relation(fields: [subscriptionOfferId], references: [id])
+
+  @@map("user_subscriptions")
+}
+
+model Notification {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String   @db.ObjectId
+  title     String
+  body      String
+  data      String? @default("")
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation("UserRelation",fields: [userId], references: [id])
+
+  @@map("notifications")
+}
 enum UserRole {
   ADMIN
   SUPER_ADMIN
@@ -219,4 +296,17 @@ enum bookingStatus {
   COMPLETE_REQUEST
   COMPLETED
   CANCELLED
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REQUIRES_CAPTURE
+}
+
+enum SubscriptionStatus {
+  PENDING
+  ACTIVE
+  EXPIRED
 }
