@@ -80,6 +80,7 @@ model Business {
   openStatus  BusinessTimeStatus @default(OPEN)
   userId      String   @db.ObjectId
   isDeleted Boolean @default(false)
+  overallRating Int @default(0)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 

@@ -6,8 +6,7 @@ import { IPaginationOptions } from "../../../interfaces/paginations";
 import prisma from "../../../shared/prisma";
 import { IBusinessFilterRequest } from "./business.interface";
 import { businessSearchableFields } from "./business.constant";
-
-
+import { format, startOfDay, endOfDay } from 'date-fns';
 
 const createIntoDb = async (req: any) => {
   const transaction = await prisma.$transaction(async (prisma) => {
@@ -80,59 +79,143 @@ const getListFromDb = async (options: IPaginationOptions, params: IBusinessFilte
     const { page, limit, skip } = paginationHelper.calculatePagination(options);
     const { searchTerm, ...filterData } = params;
 
+// Common filters (excluding location to apply separately)
+const baseWhere = {
+  isDeleted: false,
+  // Add your other filters like category, subCategory, etc.
+};
     const andConditions: any[] = [];
 
-    
-    if (searchTerm) {
-        andConditions.push({
-            OR: businessSearchableFields.map((field) => ({
-                [field]: {
-                    contains: searchTerm,
-                    mode: "insensitive",
-                },
-            })),
-        });
-    }
+  if (searchTerm) {
+    andConditions.push({
+      OR: businessSearchableFields.map((field) => ({
+        [field]: { contains: searchTerm, mode: "insensitive" },
+      })),
+    });
+  }
 
     // Filtering by name, address
-    if (filterData.name) {
-        andConditions.push({
-            name: {
-                equals: filterData.name,
-                mode: "insensitive",
-            },
-        });
-    }
-    if (filterData.address) {
-        andConditions.push({
-            address: {
-                equals: filterData.address,
-                mode: "insensitive",
-            },
-        });
-    }
+  if (filterData.name) {
+    andConditions.push({ name: { equals: filterData.name, mode: "insensitive" } });
+  }
+  if (filterData.address) {
+    andConditions.push({
+      address: { equals: filterData.address, mode: "insensitive" },
+    });
+  }
 
     // Filtering by categoryName and subCategoryName (need to join with related tables)
-    if (filterData.category) {
-        andConditions.push({
-            category: {
-                name: {
-                    equals: filterData.category,
-                    mode: "insensitive",
-                },
+  if (filterData.category) {
+    andConditions.push({
+      category: { name: { equals: filterData.category, mode: "insensitive" } },
+    });
+  }
+  if (filterData.subCategory) {
+    andConditions.push({
+      subCategory: { name: { equals: filterData.subCategory, mode: "insensitive" } },
+    });
+  }
+  // Filtering by price range
+if (filterData.priceRangeLower || filterData.priceRangeUpper) {
+  const priceFilter: any = {};
+
+  if (filterData.priceRangeLower !== undefined) {
+    priceFilter.gte = parseFloat(filterData.priceRangeLower);
+  }
+
+  if (filterData.priceRangeUpper !== undefined) {
+    priceFilter.lte = parseFloat(filterData.priceRangeUpper);
+  }
+
+  andConditions.push({
+    services: {
+      some: {
+        price: priceFilter,
+      },
+    },
+  });
+}
+
+
+  //minimum overall rating
+    if (filterData.rating !== undefined) {
+    andConditions.push({ overallRating: { gte: filterData.rating } });
+  }
+
+  // Filtering by booking date
+if (filterData.bookingDate) {
+  const bookingDate = new Date(filterData.bookingDate);
+  const start = startOfDay(bookingDate);
+  const end = endOfDay(bookingDate);
+
+  const time = format(bookingDate, "HH:mm");
+
+  andConditions.push({
+    AND: [
+      {
+        openingHours: { lte: time },
+      },
+      {
+        closingHours: { gte: time },
+      },
+      {
+        bookings: {
+          none: {
+            bookingDate: {
+              gte: start,
+              lte: end,
             },
-        });
-    }
-    if (filterData.subCategory) {
-        andConditions.push({
-            subCategory: {
-                name: {
-                    equals: filterData.subCategory,
-                    mode: "insensitive",
-                },
-            },
-        });
-    }
+          },
+        },
+      },
+    ],
+  });
+}
+
+  // Filtering by location (basic proximity check, adjust logic as needed)
+if (filterData.latitude !== undefined && filterData.longitude !== undefined) {
+  const lat = parseFloat(filterData.latitude);
+  const lng = parseFloat(filterData.longitude);
+  let nearbyBusinesses = [];
+  let otherBusinesses = [];
+  const baseWhere = {
+  isDeleted: false,
+ };
+  nearbyBusinesses = await prisma.business.findMany({
+    where: {
+      ...baseWhere,
+      latitude: {
+        gte: lat - 0.1,
+        lte: lat + 0.1,
+      },
+      longitude: {
+        gte: lng - 0.1,
+        lte: lng + 0.1,
+      },
+    },
+    include: {
+      category: true,
+      subCategory: true,
+    },
+    orderBy: {
+      createdAt: 'desc',
+    },
+  });
+
+  // Fetch other businesses not in the location range
+  otherBusinesses = await prisma.business.findMany({
+    where: {
+      ...baseWhere,
+    },
+    include: {
+      category: true,
+      subCategory: true,
+    },
+    orderBy: {
+      createdAt: 'desc',
+    },
+  });
+}
 
     const whereConditions = {
       ...(andConditions.length > 0 ? { AND: andConditions } : {}),

@@ -6,4 +6,10 @@ export const businessFilterableFields = [
   "subCategory",
   "address",
   "searchTerm",
+  "priceRangeLower",
+  "priceRangeUpper",
+  "rating",
+  "bookingDate",
+  "latitude",
+  "longitude",
 ];
