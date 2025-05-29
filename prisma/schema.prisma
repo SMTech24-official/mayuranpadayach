@@ -76,9 +76,10 @@ model Business {
   address     String? @default("")
   openingHours String
   closingHours String
-  status       BusinessStatus @default(PENDING)
-  openStatus  BusinessTimeStatus @default(CLOSED)
+  status       BusinessStatus @default(ACTIVE)
+  openStatus  BusinessTimeStatus @default(OPEN)
   userId      String   @db.ObjectId
+  isDeleted Boolean @default(false)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
