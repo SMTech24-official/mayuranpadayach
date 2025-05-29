@@ -103,6 +103,7 @@ model Service {
   isOffered   Boolean  @default(false)
   offeredPercent Int? @default(0)
   businessId  String   @db.ObjectId
+  isDeleted Boolean @default(false)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 

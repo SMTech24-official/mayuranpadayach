@@ -6,6 +6,7 @@ import { subCategoryRoutes } from "../modules/subCategory/subCategory.routes";
 import { subscriptionOfferRoutes } from "../modules/subscriptionOffer/subscriptionOffer.routes";
 import { userSubscriptionRoutes } from "../modules/userSubscription/userSubscription.routes";
 import { businessRoutes } from "../modules/business/business.routes";
+import { serviceRoutes } from "../modules/service/service.routes";
 
 
 
@@ -39,6 +40,10 @@ const moduleRoutes = [
   {
     path: "/businesses",
     route: businessRoutes,
+  },
+  {
+    path: "/services",
+    route: serviceRoutes,
   }
 ];
 

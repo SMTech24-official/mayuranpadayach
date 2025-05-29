@@ -25,7 +25,7 @@ const createIntoDb = async (req: any) => {
     }
     
     const user = await prisma.user.findUnique({
-      where: { id: userId },
+      where: { id: userId, isAllowed: true },
     });
     if (!user) {
       throw new Error('User not found');
@@ -241,7 +241,7 @@ const updateIntoDb = async (req: any) => {
     }
 
     const user = await prisma.user.findUnique({
-      where: { id: userId },
+      where: { id: userId, isAllowed: true },
     });
     if (!user) {
       throw new ApiError(httpStatus.NOT_FOUND, 'User not found');
