@@ -41,13 +41,13 @@ const createIntoDb = async (req: any) => {
 
 const getListFromDb = async () => {
   
-    const result = await prisma.category.findMany();
+    const result = await prisma.category.findMany({where: { isDeleted: false }});
     return result;
 };
 
 const getByIdFromDb = async (id: string) => {
   
-    const result = await prisma.category.findUnique({ where: { id } });
+    const result = await prisma.category.findUnique({ where: { id, isDeleted: false } });
     if (!result) {
       throw new Error('Category not found');
     }
@@ -62,7 +62,7 @@ const updateIntoDb = async (id: string, req: any) => {
     const data = req.body.data;
 
     const existingCategory = await prisma.category.findUnique({
-      where: { id },
+      where: { id , isDeleted: false },
     });
     if (!existingCategory) {
       throw new ApiError(httpStatus.NOT_FOUND, 'Category not found with id: ' + id);
@@ -99,8 +99,15 @@ const updateIntoDb = async (id: string, req: any) => {
 
 const deleteItemFromDb = async (id: string) => {
   const transaction = await prisma.$transaction(async (prisma) => {
-    const deletedItem = await prisma.category.delete({
+    const existingCategory = await prisma.category.findUnique({
+      where: { id, isDeleted: false },
+    });
+    if (!existingCategory) {
+      throw new ApiError(httpStatus.NOT_FOUND, 'Category not found with id: ' + id);
+    }
+    const deletedItem = await prisma.category.update({
       where: { id },
+      data: { isDeleted: true },
     });
 
     // Add any additional logic if necessary, e.g., cascading deletes

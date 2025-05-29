@@ -26,13 +26,13 @@ const createIntoDb = async (data: any) => {
 
 const getListFromDb = async () => {
   
-    const result = await prisma.subCategory.findMany();
+    const result = await prisma.subCategory.findMany({where: { isDeleted: false }});
     return result;
 };
 
 const getByIdFromDb = async (id: string) => {
   
-    const result = await prisma.subCategory.findUnique({ where: { id } });
+    const result = await prisma.subCategory.findUnique({ where: { id , isDeleted: false} });
     if (!result) {
       throw new Error('SubCategory not found');
     }
@@ -44,7 +44,7 @@ const getByIdFromDb = async (id: string) => {
 const updateIntoDb = async (id: string, data: any) => {
   const transaction = await prisma.$transaction(async (prisma) => {
     const result = await prisma.subCategory.update({
-      where: { id },
+      where: { id , isDeleted: false },
       data,
     });
     return result;
@@ -55,8 +55,15 @@ const updateIntoDb = async (id: string, data: any) => {
 
 const deleteItemFromDb = async (id: string) => {
   const transaction = await prisma.$transaction(async (prisma) => {
-    const deletedItem = await prisma.subCategory.delete({
+    const existingItem = await prisma.subCategory.findUnique({
+      where: { id, isDeleted: false },
+    });
+    if (!existingItem) {
+      throw new ApiError(httpStatus.NOT_FOUND, 'SubCategory not found with id: ' + id);
+    }
+    const deletedItem = await prisma.subCategory.update({
       where: { id },
+      data: { isDeleted: true },
     });
 
     // Add any additional logic if necessary, e.g., cascading deletes
