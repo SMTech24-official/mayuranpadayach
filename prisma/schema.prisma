@@ -127,6 +127,8 @@ model Specialist {
   experience Int? @default(0)
   totalRating Int? @default(0)
   totalWorks Int? @default(0)
+  isAvailable Boolean @default(true)
+  isDeleted Boolean @default(false)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 

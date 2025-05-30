@@ -7,6 +7,7 @@ import { subscriptionOfferRoutes } from "../modules/subscriptionOffer/subscripti
 import { userSubscriptionRoutes } from "../modules/userSubscription/userSubscription.routes";
 import { businessRoutes } from "../modules/business/business.routes";
 import { serviceRoutes } from "../modules/service/service.routes";
+import { specialistRoutes } from "../modules/specialist/specialist.routes";
 
 
 
@@ -44,6 +45,10 @@ const moduleRoutes = [
   {
     path: "/services",
     route: serviceRoutes,
+  },
+  {
+    path: "/specialists",
+    route: specialistRoutes,
   }
 ];
 
