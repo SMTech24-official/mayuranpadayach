@@ -8,6 +8,7 @@ import { userSubscriptionRoutes } from "../modules/userSubscription/userSubscrip
 import { businessRoutes } from "../modules/business/business.routes";
 import { serviceRoutes } from "../modules/service/service.routes";
 import { specialistRoutes } from "../modules/specialist/specialist.routes";
+import { portfolioRoutes } from "../modules/portfolio/portfolio.routes";
 
 
 
@@ -49,6 +50,10 @@ const moduleRoutes = [
   {
     path: "/specialists",
     route: specialistRoutes,
+  },
+    {
+    path: "/portfolios",  
+    route: portfolioRoutes,
   }
 ];
 

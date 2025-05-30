@@ -1,10 +1,10 @@
 import httpStatus from 'http-status';
-import sendResponse from '../../utils/sendResponse';
-import catchAsync from '../../utils/catchAsync';
+import  catchAsync  from '../../../shared/catchAsync';
+import  sendResponse  from '../../../shared/sendResponse';
 import { portfolioService } from './portfolio.service';
 
 const createPortfolio = catchAsync(async (req, res) => {
-  const result = await portfolioService.createIntoDb(req.body);
+  const result = await portfolioService.createIntoDb(req);
   sendResponse(res, {
     statusCode: httpStatus.CREATED,
     success: true,
@@ -14,7 +14,8 @@ const createPortfolio = catchAsync(async (req, res) => {
 });
 
 const getPortfolioList = catchAsync(async (req, res) => {
-  const result = await portfolioService.getListFromDb();
+  const { businessId, specialistId } = req.query;
+  const result = await portfolioService.getListFromDb(businessId as any, specialistId as any);
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
@@ -34,7 +35,7 @@ const getPortfolioById = catchAsync(async (req, res) => {
 });
 
 const updatePortfolio = catchAsync(async (req, res) => {
-  const result = await portfolioService.updateIntoDb(req.params.id, req.body);
+  const result = await portfolioService.updateIntoDb(req);
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,

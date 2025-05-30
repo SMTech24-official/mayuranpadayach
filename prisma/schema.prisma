@@ -143,6 +143,7 @@ model Specialist {
 
 model Portfolio{
   id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  title       String   @default("")
   specialistId String  @db.ObjectId
   image       String   @default("")
   businessId  String   @db.ObjectId
