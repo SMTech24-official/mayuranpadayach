@@ -9,6 +9,9 @@ import { businessRoutes } from "../modules/business/business.routes";
 import { serviceRoutes } from "../modules/service/service.routes";
 import { specialistRoutes } from "../modules/specialist/specialist.routes";
 import { portfolioRoutes } from "../modules/portfolio/portfolio.routes";
+import { favoriteRoutes } from "../modules/favorite/favorite.routes";
+import { favoriteSpecialistRoutes } from "../modules/favoriteSpecialist/favoriteSpecialist.routes";
+import { reviewRoutes } from "../modules/review/review.routes";
 
 
 
@@ -51,9 +54,21 @@ const moduleRoutes = [
     path: "/specialists",
     route: specialistRoutes,
   },
-    {
+  {
     path: "/portfolios",  
     route: portfolioRoutes,
+  },
+  {
+    path: "/favBusiness",  
+    route: favoriteRoutes,
+  },
+  {
+    path: "/favSpecialist",  
+    route: favoriteSpecialistRoutes,
+  },
+  {
+    path: "/reviews",  
+    route: reviewRoutes,
   }
 ];
 
