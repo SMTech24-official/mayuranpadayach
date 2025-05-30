@@ -11,7 +11,7 @@ router.post('/send', NotificationController.sendNotificationToUser);
 
 router.post(
     '/send-group',
-    auth(UserRole.ADMIN, UserRole.SUPER_ADMIN),
+    auth(UserRole.ADMIN),
     NotificationController.sendNotificationToUserGroup,
 )
 

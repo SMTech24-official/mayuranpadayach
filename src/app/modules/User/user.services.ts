@@ -138,7 +138,12 @@ const getUsersFromDb = async (
       })),
     });
   }
-  const whereConditons: Prisma.UserWhereInput = { AND: andCondions };
+  const whereConditons: Prisma.UserWhereInput = { 
+    AND: [
+      ...andCondions,
+      { isDeleted: false }
+    ]
+  };
 
   const result = await prisma.user.findMany({
     where: whereConditons,
@@ -184,6 +189,7 @@ const getUserFromDb = async (id: string) => {
   const user = await prisma.user.findUnique({
     where: {
       id,
+      isDeleted: false,
     },
     select: {
       id: true,
@@ -283,6 +289,38 @@ const updateUserIntoDb = async (payload: IUser, id: string) => {
   return result;
 };
 
+const deleteUser = async (id: string) => {
+  const userInfo = await prisma.user.findUniqueOrThrow({
+    where: {
+      id: id,
+      isDeleted: false,
+    },
+  });
+  if (!userInfo)
+    throw new ApiError(httpStatus.NOT_FOUND, "User not found with id: " + id);
+
+  const result = await prisma.user.update({
+    where: {
+      id: userInfo.id,
+    },
+    data: {
+      isDeleted: true,
+      updatedAt: new Date(),
+    },
+  });
+
+  if (!result)
+    throw new ApiError(
+      httpStatus.INTERNAL_SERVER_ERROR,
+      "Failed to delete user profile"
+    );
+
+  return result;
+}
+
+// delete users is 15days after isDeleted is true using cron job
+const deleteUserCronJob = async () => {
+}
 
 
 export const userService = {
@@ -291,4 +329,5 @@ export const userService = {
   getUserFromDb,
   updateProfile,
   updateUserIntoDb,
+  deleteUser
 };

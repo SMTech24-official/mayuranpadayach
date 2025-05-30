@@ -15,6 +15,7 @@ const loginUser = async (payload: { email: string; password: string, fcmToken?: 
     where: {
       email: payload.email,
       status: UserStatus.ACTIVE,
+      isDeleted: false
     },
   });
 
@@ -64,7 +65,8 @@ const getMyProfile = async (userToken: string) => {
   const userProfile = await prisma.user.findUnique({
     where: {
       id: decodedToken.id,
-      status: UserStatus.ACTIVE
+      status: UserStatus.ACTIVE,
+      isDeleted: false,
     },
     select: {
       id: true,
