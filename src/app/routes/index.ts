@@ -12,6 +12,7 @@ import { portfolioRoutes } from "../modules/portfolio/portfolio.routes";
 import { favoriteRoutes } from "../modules/favorite/favorite.routes";
 import { favoriteSpecialistRoutes } from "../modules/favoriteSpecialist/favoriteSpecialist.routes";
 import { reviewRoutes } from "../modules/review/review.routes";
+import { bookingRoutes } from "../modules/booking/booking.routes";
 
 
 
@@ -69,6 +70,10 @@ const moduleRoutes = [
   {
     path: "/reviews",  
     route: reviewRoutes,
+  },
+  {
+    path: "/bookings",  
+    route: bookingRoutes,
   }
 ];
 

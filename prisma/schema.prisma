@@ -113,6 +113,7 @@ model Service {
   business    Business @relation("BusinessServices",fields: [businessId], references: [id])
   specialists Specialist[] @relation("ServiceSpecialists")
   bookings    Booking[] @relation("ServiceBookings")
+  timeSlots   TimeSlot[] @relation("ServiceTimeSlots")
   @@map("services")
 }
 
@@ -191,7 +192,7 @@ model Booking {
   bookingDate DateTime
   timeSlot    TimeSlot[] @relation("BookingTimeSlots")
   totalPrice Float
-  paymentStatus Boolean @default(false)
+  paymentStatus Boolean @default(true)
   status      UserStatus @default(ACTIVE)
   bookingStatus bookingStatus @default(PENDING)
   createdAt   DateTime @default(now())
@@ -207,12 +208,14 @@ model Booking {
 model TimeSlot {
   id          String   @id @default(auto()) @map("_id") @db.ObjectId
   bookingId   String  @db.ObjectId
+  serviceId   String  @db.ObjectId
   startTime   DateTime
   endTime     DateTime
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   booking     Booking? @relation("BookingTimeSlots",fields: [bookingId], references: [id])
+  service     Service? @relation("ServiceTimeSlots",fields: [serviceId], references: [id])
   @@unique([startTime, endTime])
   
   @@map("timeslots")
