@@ -13,6 +13,7 @@ import { favoriteRoutes } from "../modules/favorite/favorite.routes";
 import { favoriteSpecialistRoutes } from "../modules/favoriteSpecialist/favoriteSpecialist.routes";
 import { reviewRoutes } from "../modules/review/review.routes";
 import { bookingRoutes } from "../modules/booking/booking.routes";
+import { searchHistoryRoutes } from "../modules/searchHistory/searchHistory.routes";
 
 
 
@@ -74,6 +75,10 @@ const moduleRoutes = [
   {
     path: "/bookings",  
     route: bookingRoutes,
+  },
+  {
+    path: "/searchHistories",  
+    route: searchHistoryRoutes,
   }
 ];
 

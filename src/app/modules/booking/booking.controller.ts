@@ -2,7 +2,12 @@ import httpStatus from 'http-status';
 import catchAsync from '../../../shared/catchAsync';
 import sendResponse from '../../../shared/sendResponse';
 import { bookingService } from './booking.service';
+import pick from '../../../shared/pick';
 
+export const bookingFilterableFields = [
+  "bookingStatus",
+  "searchTerm",
+];
 const getTimeSlots = catchAsync(async (req, res) => {
   const { serviceId, startTime, endTime } = req.query;
 
@@ -40,11 +45,25 @@ const createBooking = catchAsync(async (req, res) => {
 });
 
 const getBookingList = catchAsync(async (req, res) => {
-  const result = await bookingService.getListFromDb();
+  const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder'])
+  const result = await bookingService.getListFromDb(options);
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
     message: 'Booking list retrieved successfully',
+    data: result,
+  });
+});
+
+const getListForUser = catchAsync(async (req, res) => {
+  const userId = req.user.id;
+  const filters = pick(req.query, bookingFilterableFields);
+  const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder'])
+  const result = await bookingService.getListForUserDB(userId, options, filters);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Booking list for user retrieved successfully',
     data: result,
   });
 });
@@ -83,6 +102,7 @@ export const bookingController = {
   getTimeSlots,
   createBooking,
   getBookingList,
+  getListForUser,
   getBookingById,
   updateBooking,
   deleteBooking,

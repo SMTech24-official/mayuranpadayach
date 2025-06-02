@@ -35,6 +35,7 @@ model User {
   subscriptionOffer   UserSubscription[] @relation("UserRelation")
   adminSubscription   SubscriptionOffer[] @relation("UserRelation")
   notifications     Notification[] @relation("UserRelation")
+  searchHistory    SearchHistory[] @relation("UserSearchHistory")
   @@map("users")
 }
 
@@ -62,6 +63,17 @@ model SubCategory {
   category    Category @relation("CategorySubCategories",fields: [categoryId], references: [id])
   businesses  Business[] @relation("SubCategoryBusinesses")
   @@map("subcategories")
+}
+
+model SearchHistory {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId      String   @db.ObjectId
+  searchTerm  String   @default("")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user        User     @relation("UserSearchHistory",fields: [userId], references: [id])
+  @@map("search_history")
 }
 
 model Business {
@@ -195,6 +207,7 @@ model Booking {
   paymentStatus Boolean @default(true)
   status      UserStatus @default(ACTIVE)
   bookingStatus bookingStatus @default(PENDING)
+  isDeleted Boolean @default(false)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -211,6 +224,7 @@ model TimeSlot {
   serviceId   String  @db.ObjectId
   startTime   DateTime
   endTime     DateTime
+  isDeleted Boolean @default(false)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 

@@ -76,16 +76,12 @@ const createIntoDb = async (req: any) => {
 };
 
 const getListFromDb = async (options: IPaginationOptions, params: IBusinessFilterRequest) => {
-    const { page, limit, skip } = paginationHelper.calculatePagination(options);
-    const { searchTerm, ...filterData } = params;
+  const { page, limit, skip } = paginationHelper.calculatePagination(options);
+  const { searchTerm, ...filterData } = params;
 
-// Common filters (excluding location to apply separately)
-const baseWhere = {
-  isDeleted: false,
-  // Add your other filters like category, subCategory, etc.
-};
-    const andConditions: any[] = [];
+  const andConditions: any[] = [];
 
+  // Search term filter
   if (searchTerm) {
     andConditions.push({
       OR: businessSearchableFields.map((field) => ({
@@ -94,17 +90,15 @@ const baseWhere = {
     });
   }
 
-    // Filtering by name, address
+  // Name and address filters
   if (filterData.name) {
     andConditions.push({ name: { equals: filterData.name, mode: "insensitive" } });
   }
   if (filterData.address) {
-    andConditions.push({
-      address: { equals: filterData.address, mode: "insensitive" },
-    });
+    andConditions.push({ address: { equals: filterData.address, mode: "insensitive" } });
   }
 
-    // Filtering by categoryName and subCategoryName (need to join with related tables)
+  // Category and subCategory filters
   if (filterData.category) {
     andConditions.push({
       category: { name: { equals: filterData.category, mode: "insensitive" } },
@@ -115,139 +109,101 @@ const baseWhere = {
       subCategory: { name: { equals: filterData.subCategory, mode: "insensitive" } },
     });
   }
-  // Filtering by price range
-if (filterData.priceRangeLower || filterData.priceRangeUpper) {
-  const priceFilter: any = {};
 
-  if (filterData.priceRangeLower !== undefined) {
-    priceFilter.gte = parseFloat(filterData.priceRangeLower);
-  }
+  // Price range filter
+  if (filterData.priceRangeLower || filterData.priceRangeUpper) {
+    const priceFilter: any = {};
+    if (filterData.priceRangeLower !== undefined) {
+      priceFilter.gte = parseFloat(filterData.priceRangeLower);
+    }
+    if (filterData.priceRangeUpper !== undefined) {
+      priceFilter.lte = parseFloat(filterData.priceRangeUpper);
+    }
 
-  if (filterData.priceRangeUpper !== undefined) {
-    priceFilter.lte = parseFloat(filterData.priceRangeUpper);
-  }
-
-  andConditions.push({
-    services: {
-      some: {
-        price: priceFilter,
+    andConditions.push({
+      services: {
+        some: {
+          price: priceFilter,
+        },
       },
-    },
+    });
+  }
+
+  // Rating filter
+if (filterData.rating !== undefined) {
+  // Accept both string and number, always compare as integer
+  andConditions.push({
+    overallRating: Math.floor(Number(filterData.rating)),
   });
 }
 
+  // Booking date & time filter
+  if (filterData.bookingDate) {
+    const bookingDate =
+      typeof filterData.bookingDate === "string"
+        ? new Date(filterData.bookingDate)
+        : new Date(filterData.bookingDate);
 
-  //minimum overall rating
-    if (filterData.rating !== undefined) {
-    andConditions.push({ overallRating: { gte: filterData.rating } });
-  }
-
-  // Filtering by booking date
-if (filterData.bookingDate) {
-  const bookingDate = new Date(filterData.bookingDate);
-  const start = startOfDay(bookingDate);
-  const end = endOfDay(bookingDate);
-
-  const time = format(bookingDate, "HH:mm");
-
-  andConditions.push({
-    AND: [
-      {
-        openingHours: { lte: time },
-      },
-      {
-        closingHours: { gte: time },
-      },
-      {
-        bookings: {
-          none: {
-            bookingDate: {
-              gte: start,
-              lte: end,
+    andConditions.push({
+      AND: [
+        {
+          bookings: {
+            none: {
+              bookingDate: {
+                equals: bookingDate, // check exact time match
+              },
             },
           },
         },
-      },
-    ],
-  });
-}
+      ],
+    });
+  }
 
-  // Filtering by location (basic proximity check, adjust logic as needed)
-if (filterData.latitude !== undefined && filterData.longitude !== undefined) {
-  const lat = parseFloat(filterData.latitude);
-  const lng = parseFloat(filterData.longitude);
-  let nearbyBusinesses = [];
-  let otherBusinesses = [];
-  const baseWhere = {
-  isDeleted: false,
- };
-  nearbyBusinesses = await prisma.business.findMany({
-    where: {
-      ...baseWhere,
-      latitude: {
-        gte: lat - 0.1,
-        lte: lat + 0.1,
-      },
-      longitude: {
-        gte: lng - 0.1,
-        lte: lng + 0.1,
-      },
+  // Location filter (latitude and longitude proximity)
+  if (filterData.latitude !== undefined && filterData.longitude !== undefined) {
+    const lat = parseFloat(filterData.latitude);
+    const lng = parseFloat(filterData.longitude);
+
+    andConditions.push({
+      latitude: { gte: lat - 0.1, lte: lat + 0.1 },
+    });
+    andConditions.push({
+      longitude: { gte: lng - 0.1, lte: lng + 0.1 },
+    });
+  }
+
+  const whereConditions = {
+    ...(andConditions.length > 0 ? { AND: andConditions } : {}),
+    isDeleted: false,
+  };
+
+  const result = await prisma.business.findMany({
+    where: whereConditions,
+    skip,
+    take: limit,
+    orderBy: {
+      createdAt: "desc",
     },
     include: {
       category: true,
       subCategory: true,
     },
-    orderBy: {
-      createdAt: 'desc',
-    },
   });
 
-  // Fetch other businesses not in the location range
-  otherBusinesses = await prisma.business.findMany({
-    where: {
-      ...baseWhere,
-    },
-    include: {
-      category: true,
-      subCategory: true,
-    },
-    orderBy: {
-      createdAt: 'desc',
-    },
+  const total = await prisma.business.count({
+    where: whereConditions,
   });
-}
 
-    const whereConditions = {
-      ...(andConditions.length > 0 ? { AND: andConditions } : {}),
-      isDeleted: false,
-    };
-
-    const result = await prisma.business.findMany({
-        where: whereConditions,
-        skip,
-        take: limit,
-        orderBy: {
-            createdAt: "desc",
-        },
-        include: {
-            category: true,
-            subCategory: true,
-        },
-    });
-
-    const total = await prisma.business.count({
-        where: whereConditions,
-    });
-
-    return {
-        meta: {
-            page,
-            limit,
-            total,
-        },
-        data: result,
-    };
+  return {
+    meta: {
+      page,
+      limit,
+      total,
+    },
+    data: result,
+  };
 };
+
 
 const getListForAdminFromDb = async (options: IPaginationOptions) => {
   const { page, limit, skip } = paginationHelper.calculatePagination(options);

@@ -14,7 +14,13 @@ auth(UserRole.USER),
 bookingController.createBooking,
 );
 
-router.get('/', auth(), bookingController.getBookingList);
+router.get('/', auth(UserRole.ADMIN), bookingController.getBookingList);
+
+router.get(
+'/user-bookings',
+auth(UserRole.USER, UserRole.PROFESSIONAL),
+bookingController.getListForUser,
+);
 
 router.get(
 '/time-slots',
@@ -31,6 +37,6 @@ validateRequest(bookingValidation.updateSchema),
 bookingController.updateBooking,
 );
 
-router.delete('/:id', auth(), bookingController.deleteBooking);
+router.delete('/:id', auth(UserRole.ADMIN), bookingController.deleteBooking);
 
 export const bookingRoutes = router;

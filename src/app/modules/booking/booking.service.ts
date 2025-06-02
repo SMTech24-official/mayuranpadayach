@@ -1,6 +1,8 @@
 import httpStatus from "http-status";
 import ApiError from "../../../errors/ApiErrors";
 import prisma from "../../../shared/prisma";
+import { IPaginationOptions } from "../../../interfaces/paginations";
+import { paginationHelper } from "../../../helpars/paginationHelper";
 
 
 const getTimeSlotsFromDb = async (serviceId: string, startTime?: Date, endTime?: Date) => {
@@ -90,28 +92,219 @@ const createIntoDb = async (userId: string, data: any) => {
   return transaction;
 };
 
-const getListFromDb = async () => {
-  
-    const result = await prisma.booking.findMany();
-    return result;
+const getListFromDb = async (options: IPaginationOptions) => {
+    const { page, limit, skip } = paginationHelper.calculatePagination(options);
+    const result = await prisma.booking.findMany({
+      where: {
+        isDeleted: false,
+      },
+      skip,
+    take: limit,
+    orderBy: {
+      createdAt: 'desc',
+    },
+    include:{
+      user: {
+        select: {
+          fullName: true,
+          profileImage: true,
+        },
+      },
+      business: {
+        select: {
+          name: true,
+          address: true,
+        },
+      },
+      service: {
+        select: {
+          name: true,
+          price: true,
+        },
+      },
+    }
+    });
+
+    const total = await prisma.booking.count({ where: { isDeleted: false } });
+    return {
+      meta: {
+      page,
+      limit,
+      total,
+    },
+      result
+    };
 };
+
+
+export const bookingSearchableFields = ['bookingStatus'];
+
+const getListForUserDB = async (
+  userId: string,
+  options: IPaginationOptions,
+  params: { searchTerm?: string }
+) => {
+  const { page, limit, skip } = paginationHelper.calculatePagination(options);
+  const { searchTerm } = params;
+  const andConditions: any[] = [];
+
+  const user = await prisma.user.findUnique({
+    where: { id: userId, isDeleted: false },
+  });
+  if (!user) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'User not found');
+  }
+
+  if (searchTerm) {
+    andConditions.push({
+      OR: bookingSearchableFields.map((field) => ({
+        [field]: { contains: searchTerm, mode: "insensitive" },
+      })),
+    });
+  }
+
+if (user.role === 'PROFESSIONAL') {
+  const business = await prisma.business.findFirst({
+    where: { userId, isDeleted: false },
+  });
+  if (!business) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Business not found for this user');
+  }
+  andConditions.push({ businessId: business.id });
+} else if (user.role === 'USER') {
+  // For regular users, we don't need to filter by business
+  andConditions.push({ userId });
+}
+
+// Always filter by isDeleted: false
+const whereConditions =
+  andConditions.length > 0
+    ? { AND: [...andConditions, { isDeleted: false }] }
+    : { isDeleted: false };
+
+  const result = await prisma.booking.findMany({
+    where: whereConditions,
+    skip,
+    take: limit,
+    orderBy: {
+      createdAt: 'desc',
+    },
+    include: {
+      user: {
+        select: {
+          fullName: true,
+          profileImage: true,
+        },
+      },
+      business: {
+        select: {
+          name: true,
+          image: true,
+          address: true,
+          overallRating: true,
+        },
+      },
+      service: {
+        select: {
+          name: true,
+          price: true,
+        },
+      },
+      specialist: {
+        select: {
+          fullName: true,
+          profileImage: true,
+          specialization: true,
+        },
+      },
+    },
+  });
+
+  const total = await prisma.booking.count({ where: whereConditions });
+
+  return {
+    meta: {
+      page,
+      limit,
+      total,
+    },
+    result,
+  };
+};
+
 
 const getByIdFromDb = async (id: string) => {
   
-    const result = await prisma.booking.findUnique({ where: { id } });
+    const result = await prisma.booking.findUnique({ where: { id },
+    include: {
+      user: {
+        select: {
+          fullName: true,
+          profileImage: true,
+        },
+      },
+      business: {
+        select: {
+          name: true,
+          image: true,
+          address: true,
+          overallRating: true,
+        },
+      },
+      service: {
+        select: {
+          name: true,
+          price: true,
+        },
+      },
+      specialist: {
+        select: {
+          fullName: true,
+          profileImage: true,
+          specialization: true,
+        },
+      },
+    }, });
     if (!result) {
-      throw new Error('Booking not found');
+      throw new ApiError(httpStatus.NOT_FOUND,'Booking not found');
     }
     return result;
   };
 
 const updateIntoDb = async (id: string, data: any) => {
   const transaction = await prisma.$transaction(async (prisma) => {
-    const result = await prisma.booking.update({
+    const existingBooking = await prisma.booking.findUnique({
       where: { id },
-      data,
     });
-    return result;
+
+    if (!existingBooking) {
+      throw new ApiError(httpStatus.NOT_FOUND, 'Booking not found');
+    }
+
+    await prisma.timeSlot.deleteMany({
+      where: { bookingId: id },
+    });
+    // Update booking with new data
+    const updatedBooking = await prisma.booking.update({
+      where: { id, isDeleted: false },
+      data: {
+        bookingStatus: data.bookingStatus || existingBooking.bookingStatus,
+        bookingDate: data.bookingDate || existingBooking.bookingDate,
+        serviceId: data.serviceId || existingBooking.serviceId,
+        specialistId: data.specialistId || existingBooking.specialistId,
+        totalPrice: data.totalPrice || existingBooking.totalPrice,
+        status: data.status || existingBooking.status,
+        timeSlot: {
+          create: data.timeSlot.map((slot: any) => ({
+            serviceId: data.serviceId || existingBooking.serviceId,
+            startTime: new Date(slot.startTime),
+            endTime: new Date(slot.endTime),
+          })),
+        },
+      },
+    });
+
+    return updatedBooking;
   });
 
   return transaction;
@@ -119,20 +312,26 @@ const updateIntoDb = async (id: string, data: any) => {
 
 const deleteItemFromDb = async (id: string) => {
   const transaction = await prisma.$transaction(async (prisma) => {
-    const deletedItem = await prisma.booking.delete({
+    const deletedItem = await prisma.booking.update({
       where: { id },
+      data: {
+        isDeleted: true,
+        updatedAt: new Date(),
+        timeSlot: {
+          updateMany: {where: { bookingId: id }, data: { isDeleted: true } },
+      },
+    }
     });
-
     // Add any additional logic if necessary, e.g., cascading deletes
     return deletedItem;
-  });
-
+    });
   return transaction;
 };
 
 export const bookingService = {
 createIntoDb,
 getListFromDb,
+getListForUserDB,
 getByIdFromDb,
 updateIntoDb,
 deleteItemFromDb,
