@@ -10,8 +10,18 @@ const app: Application = express();
 
 export const corsOptions = {
   origin: ["http://localhost:3001", "http://localhost:3000"],
-  methods: ["GET", "POST", "PUT", "DELETE"],
-  allowedHeaders: ["Content-Type", "Authorization"],
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+  allowedHeaders: [
+    "Content-Type",
+    "Authorization",
+    "Accept",
+    "X-Requested-With",
+    "Origin",
+    "Cache-Control",
+    "X-CSRF-Token",
+    "User-Agent",
+    "Content-Length",
+  ],
   credentials: true,
 };
 
