@@ -8,7 +8,7 @@ import { paginationHelper } from "../../../helpars/paginationHelper";
 import { Prisma, User, UserRole } from "@prisma/client";
 import { userSearchAbleFields } from "./user.costant";
 import config from "../../../config";
-import httpStatus from "http-status";
+import httpStatus, { NOT_FOUND } from "http-status";
 import { Request } from "express";
 import { fileUploader } from "../../../helpars/fileUploader";
 import { Secret } from "jsonwebtoken";
@@ -172,7 +172,7 @@ const getUsersFromDb = async (
   });
 
   if (!result || result.length === 0) {
-    throw new ApiError(404, "No active users found");
+    throw new ApiError(NOT_FOUND, "No active users found");
   }
   return {
     meta: {
