@@ -40,14 +40,36 @@ const createIntoDb = async (req: any) => {
 };
 
 const getListFromDb = async () => {
-  
-    const result = await prisma.category.findMany({where: { isDeleted: false }});
-    return result;
+  const result = await prisma.category.findMany({
+    where: {
+      isDeleted: false,
+    },
+    include: {
+      subCategories: { // <-- use subCategories (plural) as per your schema
+        select: {
+          id: true,
+          name: true,
+        },
+      },
+    },
+    orderBy: {
+      createdAt: 'desc',
+    },
+  });
+  return result;
 };
 
 const getByIdFromDb = async (id: string) => {
   
-    const result = await prisma.category.findUnique({ where: { id, isDeleted: false } });
+    const result = await prisma.category.findUnique({ where: { id, isDeleted: false },
+    include: {
+      subCategories: { 
+        select: {
+          id: true,
+          name: true,
+        },
+      },
+    }, });
     if (!result) {
       throw new Error('Category not found');
     }
