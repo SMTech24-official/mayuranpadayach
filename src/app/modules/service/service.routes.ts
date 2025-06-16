@@ -28,6 +28,6 @@ fileUploader.uploadSingle,
 serviceController.updateService,
 );
 
-router.delete('/:id', auth(UserRole.ADMIN), serviceController.deleteService);
+router.delete('/:id', auth(UserRole.ADMIN, UserRole.PROFESSIONAL), serviceController.deleteService);
 
 export const serviceRoutes = router;

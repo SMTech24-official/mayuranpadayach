@@ -318,6 +318,8 @@ const updateIntoDb = async (req: any) => {
         name: parsedData.name || existingBusiness.name,
         categoryId: existingCategory.id || existingBusiness.categoryId,
         subCategoryId: existingSubCategory.id || existingBusiness.subCategoryId,
+        about: parsedData.about || existingBusiness.about,
+        contactNumber: parsedData.contactNumber || existingBusiness.contactNumber,
         latitude: parsedData.latitude || existingBusiness.latitude,
         longitude: parsedData.longitude || existingBusiness.longitude,
         address: parsedData.address || existingBusiness.address,
