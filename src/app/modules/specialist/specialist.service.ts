@@ -135,10 +135,37 @@ const getListForUserFromDb = async (options: IPaginationOptions, params: ISpecia
   };
 };
 
-const getAllListFromDb = async (options: IPaginationOptions) => {
+const getAllListFromDb = async (userId: string, options: IPaginationOptions) => {
+  const user = await prisma.user.findUnique({
+    where: { id: userId, isDeleted: false },
+  });
+
+  if (!user) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'User not found');
+  }
+
   const { page, limit, skip } = paginationHelper.calculatePagination(options);
+
+  let whereCondition: any = { isDeleted: false };
+
+  if (user.role === 'PROFESSIONAL') {
+    // Find the business owned by this professional
+    const business = await prisma.business.findFirst({
+      where: { userId: user.id, isDeleted: false },
+    });
+    if (business) {
+      whereCondition.businessId = business.id;
+    } else {
+      // If no business found, return empty result
+      return {
+        meta: { page, limit, total: 0 },
+        data: [],
+      };
+    }
+  }
+
   const result = await prisma.specialist.findMany({
-    where: { isDeleted: false },
+    where: whereCondition,
     skip,
     take: limit,
     include: {
@@ -155,9 +182,11 @@ const getAllListFromDb = async (options: IPaginationOptions) => {
     },
     orderBy: { createdAt: 'desc' },
   });
+
   const total = await prisma.specialist.count({
-    where: { isDeleted: false },
+    where: whereCondition,
   });
+
   return {
     meta: {
       page,

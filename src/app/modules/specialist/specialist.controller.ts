@@ -28,8 +28,9 @@ const getListForUser = catchAsync(async (req, res) => {
 });
 
 const getSpecialistList = catchAsync(async (req, res) => {
+  const userId = req.user.id;
   const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
-  const result = await specialistService.getAllListFromDb(options);
+  const result = await specialistService.getAllListFromDb(userId,options);
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
