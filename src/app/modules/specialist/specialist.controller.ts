@@ -39,6 +39,18 @@ const getSpecialistList = catchAsync(async (req, res) => {
   });
 });
 
+const getSpecialistListByBusinessId = catchAsync(async (req, res) => {
+  const businessId = req.params.businessId;
+  const options = pick(req.query, ['limit', 'page', 'sortBy', 'sortOrder']);
+  const result = await specialistService.getAllByBusinessIdFromDb(businessId, options);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Specialist list by business ID retrieved successfully',
+    data: result,
+  });
+});
+
 const getSpecialistById = catchAsync(async (req, res) => {
   const result = await specialistService.getByIdFromDb(req.params.id);
   sendResponse(res, {
@@ -73,6 +85,7 @@ export const specialistController = {
   createSpecialist,
   getSpecialistList,
   getListForUser,
+  getSpecialistListByBusinessId,
   getSpecialistById,
   updateSpecialist,
   deleteSpecialist,

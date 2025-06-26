@@ -267,6 +267,32 @@ const resetPassword = async (payload: { password: string; email: string }) => {
 
   return { message: 'Password reset successfully' };
 };
+
+
+ const getDashboardDataDB = async () => {
+  const [totalUser, totalBooking, totalBusiness, totalWorker] = await Promise.all([
+    prisma.user.count({
+      where: { isDeleted: false },
+    }),
+    prisma.booking.count({
+      where: { isDeleted: false },
+    }),
+    prisma.business.count({
+      where: { isDeleted: false },
+    }),
+    prisma.specialist.count({
+      where: { isDeleted: false },
+    }),
+  ]);
+
+  return {
+    totalUser,
+    totalBooking,
+    totalBusiness,
+    totalWorker,
+  };
+};
+
 export const AuthServices = {
   loginUser,
   getMyProfile,
@@ -274,5 +300,6 @@ export const AuthServices = {
   forgotPassword,
   resetPassword,
   resendOtp,
-  verifyForgotPasswordOtp
+  verifyForgotPasswordOtp,
+  getDashboardDataDB
 };

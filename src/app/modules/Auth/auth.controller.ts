@@ -3,7 +3,6 @@ import catchAsync from "../../../shared/catchAsync";
 import { AuthServices } from "./auth.service";
 import sendResponse from "../../../shared/sendResponse";
 import httpStatus from "http-status";
-import { string } from "zod";
 
 const loginUser = catchAsync(async (req: Request, res: Response) => {
 
@@ -114,6 +113,16 @@ const resetPassword = catchAsync(async (req: Request, res: Response) => {
 });
 
 
+const getDashboardData = catchAsync(async (req: Request, res: Response) => {
+  const result = await AuthServices.getDashboardDataDB();
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Dashboard data retrieved successfully",
+    data: result,
+  });
+});
+
 
 export const AuthController = {
   loginUser,
@@ -123,5 +132,6 @@ export const AuthController = {
   forgotPassword,
   resetPassword,
   resendOtp,
-  verifyForgotPasswordOtp
+  verifyForgotPasswordOtp,
+  getDashboardData
 };

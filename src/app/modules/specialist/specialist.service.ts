@@ -135,6 +135,44 @@ const getListForUserFromDb = async (options: IPaginationOptions, params: ISpecia
   };
 };
 
+
+const getAllByBusinessIdFromDb = async (businessId: string, options: IPaginationOptions) => {
+  const { page, limit, skip } = paginationHelper.calculatePagination(options);
+  const whereCondition: any = {
+    isDeleted: false,
+    businessId,
+  };
+  const result = await prisma.specialist.findMany({
+    where: whereCondition,
+    skip,
+    take: limit,
+    include: {
+      business: {
+        select: {
+          name: true,
+        },
+      },
+      service: {
+        select: {
+          name: true,
+        },
+      },
+    },
+    orderBy: { createdAt: 'desc' },
+  });
+  const total = await prisma.specialist.count({
+    where: whereCondition,
+  });
+  return {
+    meta: {
+      page,
+      limit,
+      total,
+    },
+    data: result,
+  };
+};
+
 const getAllListFromDb = async (userId: string, options: IPaginationOptions) => {
   const user = await prisma.user.findUnique({
     where: { id: userId, isDeleted: false },
@@ -155,13 +193,7 @@ const getAllListFromDb = async (userId: string, options: IPaginationOptions) => 
     });
     if (business) {
       whereCondition.businessId = business.id;
-    } else {
-      // If no business found, return empty result
-      return {
-        meta: { page, limit, total: 0 },
-        data: [],
-      };
-    }
+    } 
   }
 
   const result = await prisma.specialist.findMany({
@@ -271,6 +303,7 @@ const deleteItemFromDb = async (id: string) => {
 export const specialistService = {
 createIntoDb,
 getListForUserFromDb,
+getAllByBusinessIdFromDb,
 getAllListFromDb,
 getByIdFromDb,
 updateIntoDb,

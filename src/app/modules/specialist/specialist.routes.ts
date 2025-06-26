@@ -20,6 +20,8 @@ router.get('/', auth(UserRole.USER), specialistController.getListForUser);
 
 router.get('/all', auth(UserRole.PROFESSIONAL, UserRole.ADMIN), specialistController.getSpecialistList);
 
+router.get('/business/:businessId',auth(UserRole.USER),specialistController.getSpecialistListByBusinessId);
+
 router.get('/:id', auth(UserRole.PROFESSIONAL, UserRole.ADMIN), specialistController.getSpecialistById);
 
 router.put(

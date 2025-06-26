@@ -24,6 +24,12 @@ router.get(
   AuthController.getMyProfile
 );
 
+router.get(
+  "/dashboard",
+  auth(UserRole.ADMIN),
+  AuthController.getDashboardData
+);
+
 router.put(
   "/change-password",
   auth(),
