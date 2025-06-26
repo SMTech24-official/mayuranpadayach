@@ -25,6 +25,17 @@ const getReviewList = catchAsync(async (req, res) => {
   });
 });
 
+const getReviewListForSpecialist = catchAsync(async (req, res) => {
+  const specialistId = req.params.specialistId;
+  const result = await reviewService.getListForSpecialistFromDb(specialistId);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Review list for specialist retrieved successfully',
+    data: result,
+  });
+});
+
 const getReviewById = catchAsync(async (req, res) => {
   const result = await reviewService.getByIdFromDb(req.params.id);
   sendResponse(res, {
@@ -39,5 +50,6 @@ const getReviewById = catchAsync(async (req, res) => {
 export const reviewController = {
   createReview,
   getReviewList,
+  getReviewListForSpecialist,
   getReviewById
 };

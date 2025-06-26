@@ -114,6 +114,34 @@ const getListFromDb = async (businessId: string) => {
     return result;
 };
 
+const getListForSpecialistFromDb = async (specialistId: string) => {
+    if (!specialistId) {
+      throw new ApiError(httpStatus.BAD_REQUEST, 'Specialist ID is required');
+    }
+    const existingSpecialist = await prisma.specialist.findUnique({
+      where: { id: specialistId, isDeleted: false },
+    });
+    if (!existingSpecialist) {
+      throw new ApiError(httpStatus.NOT_FOUND, 'Specialist not found');
+    }
+    const result = await prisma.review.findMany(
+      {
+        where: { specialistId },
+        include: {
+          user: {
+            select: {
+              id: true,
+              fullName: true,
+              profileImage: true
+            },
+          }
+        },
+        orderBy: { createdAt: 'desc' },
+      }
+    );
+    return result;
+}
+
 const getByIdFromDb = async (id: string) => {
   
     const result = await prisma.review.findUnique({ where: { id } });
@@ -126,5 +154,6 @@ const getByIdFromDb = async (id: string) => {
 export const reviewService = {
 createIntoDb,
 getListFromDb,
+getListForSpecialistFromDb,
 getByIdFromDb,
 };

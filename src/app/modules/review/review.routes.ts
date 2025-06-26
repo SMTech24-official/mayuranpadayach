@@ -13,6 +13,8 @@ reviewController.createReview,
 
 router.get('/business/:businessId', auth(UserRole.PROFESSIONAL, UserRole.ADMIN), reviewController.getReviewList);
 
+router.get('/specialist/:specialistId', auth(UserRole.USER), reviewController.getReviewListForSpecialist);
+
 router.get('/:id', auth(), reviewController.getReviewById);
 
 export const reviewRoutes = router;
