@@ -14,7 +14,7 @@ auth(UserRole.USER),
 bookingController.createBooking,
 );
 
-router.get('/', auth(UserRole.ADMIN), bookingController.getBookingList);
+router.get('/', auth(), bookingController.getBookingList);
 
 router.get(
 '/user-bookings',
