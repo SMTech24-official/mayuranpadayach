@@ -9,6 +9,7 @@ const getTimeSlotsFromDb = async (serviceId: string, startTime?: Date, endTime?:
   const result = await prisma.timeSlot.findMany({
     where: {
       serviceId,
+      isDeleted: false,
       ...(startTime && endTime && {
         startTime: {
           gte: startTime,
