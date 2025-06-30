@@ -275,6 +275,7 @@ const updateIntoDb = async (req: any) => {
     const existingBusiness = await prisma.business.findUnique({
       where: { id , isDeleted: false},
     });
+
     if (!existingBusiness) {
       throw new ApiError(httpStatus.NOT_FOUND, 'Business not found with id: ' + id);
     }
@@ -287,19 +288,8 @@ const updateIntoDb = async (req: any) => {
     }
 
     const parsedData = JSON.parse(data);
-
-    const existingCategory = await prisma.category.findUnique({
-      where: { id: parsedData.categoryId },
-    });
-    if (!existingCategory) {
-      throw new ApiError(httpStatus.NOT_FOUND, 'Category not found');
-    }
-
-    const existingSubCategory = await prisma.subCategory.findUnique({
-      where: { id: parsedData.subCategoryId },
-    });
-    if (!existingSubCategory) {
-      throw new ApiError(httpStatus.NOT_FOUND, 'SubCategory not found');
+    if (!parsedData) {
+      throw new ApiError(httpStatus.BAD_REQUEST, 'Missing business data');
     }
 
     let image: string | undefined;
@@ -308,29 +298,54 @@ const updateIntoDb = async (req: any) => {
         const res = await fileUploader.uploadToDigitalOcean(file);
         image = res.Location;
       } catch (error) {
-        throw new Error('Failed to upload image');
+        throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, 'Failed to upload image');
       }
     }
 
+  if(parsedData.categoryId){  const existingCategory = await prisma.category.findUnique({
+      where: { id: parsedData.categoryId },
+    });
+    if (!existingCategory) {
+      throw new ApiError(httpStatus.NOT_FOUND, 'Category not found');
+    }}
+
+    let existingCategory = null;
+    if(parsedData.categoryId){
+      existingCategory = await prisma.category.findUnique({
+        where: { id: parsedData.categoryId },
+      });
+      if (!existingCategory) {
+        throw new ApiError(httpStatus.NOT_FOUND, 'Category not found');
+      }
+    }
+
+    let existingSubCategory = null;
+    if(parsedData.subCategoryId){
+      existingSubCategory = await prisma.subCategory.findUnique({
+        where: { id: parsedData.subCategoryId },
+      });
+      if (!existingSubCategory) {
+        throw new ApiError(httpStatus.NOT_FOUND, 'SubCategory not found');
+      }
+    }
     const result = await prisma.business.update({
       where: { id },
       data: {
         name: parsedData.name || existingBusiness.name,
-        categoryId: existingCategory.id || existingBusiness.categoryId,
-        subCategoryId: existingSubCategory.id || existingBusiness.subCategoryId,
+        categoryId: (existingCategory ? existingCategory.id : existingBusiness.categoryId),
+        subCategoryId: (existingSubCategory ? existingSubCategory.id : existingBusiness.subCategoryId),
         about: parsedData.about || existingBusiness.about,
         contactNumber: parsedData.contactNumber || existingBusiness.contactNumber,
         latitude: parsedData.latitude || existingBusiness.latitude,
         longitude: parsedData.longitude || existingBusiness.longitude,
         address: parsedData.address || existingBusiness.address,
         openingHours: parsedData.openingHours || existingBusiness.openingHours,
-        closingHours: data.closingHours || existingBusiness.closingHours,
+        closingHours: parsedData.closingHours || existingBusiness.closingHours,
         image: image || existingBusiness.image,
         status: parsedData.status || existingBusiness.status,
         openStatus: parsedData.openStatus || existingBusiness.openStatus,
       },
     });
-
     return result;
   });
 
