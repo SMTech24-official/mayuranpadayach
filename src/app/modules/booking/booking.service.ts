@@ -294,17 +294,17 @@ const updateIntoDb = async (id: string, data: any) => {
         specialistId: data.specialistId || existingBooking.specialistId,
         totalPrice: data.totalPrice || existingBooking.totalPrice,
         status: data.status || existingBooking.status,
-        timeSlot: {
-          create: data.timeSlot.map((slot: any) => ({
-            serviceId: data.serviceId || existingBooking.serviceId,
-            startTime: new Date(slot.startTime),
-            endTime: new Date(slot.endTime),
-          })),
-        },
+        // timeSlot: {
+        //   create: data.timeSlot.map((slot: any) => ({
+        //     serviceId: data.serviceId || existingBooking.serviceId,
+        //     startTime: new Date(slot.startTime),
+        //     endTime: new Date(slot.endTime),
+        //   })),
+        // },
       },
     });
 
-    return updatedBooking;
+    return {message: 'Booking updated successfully'};
   });
 
   return transaction;
