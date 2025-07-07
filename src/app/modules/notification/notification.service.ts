@@ -4,21 +4,25 @@ import admin from '../../../shared/firebase';
 import prisma from '../../../shared/prisma';
 
 const sendNotification = async (
-  deviceToken: string,
   title: string,
   body: string,
   userId: string,
+  deviceToken?: string,
 ) => {
-  const message = {
-    notification: { title, body },
-    token: deviceToken,
-  };
-
-  console.log(message);
+  let message;
+  if (deviceToken) {
+    message = {
+      notification: { title, body },
+      token: deviceToken,
+    };
+    console.log(message);
+  }
 
   try {
-    const test = await admin.messaging().send(message);
-    console.log(test);
+    if (message) {
+      const test = await admin.messaging().send(message);
+      console.log(test);
+    }
 
     await prisma.notification.create({
       data: {
@@ -33,7 +37,6 @@ const sendNotification = async (
     throw error;
   }
 };
-
 const getAllNotifications = async () => {
   try {
     const notifications = await prisma.notification.findMany({

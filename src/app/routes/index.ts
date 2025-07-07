@@ -14,6 +14,7 @@ import { favoriteSpecialistRoutes } from "../modules/favoriteSpecialist/favorite
 import { reviewRoutes } from "../modules/review/review.routes";
 import { bookingRoutes } from "../modules/booking/booking.routes";
 import { searchHistoryRoutes } from "../modules/searchHistory/searchHistory.routes";
+import { NotificationRoutes } from "../modules/notification/notification.routes";
 
 
 
@@ -79,6 +80,10 @@ const moduleRoutes = [
   {
     path: "/searchHistories",  
     route: searchHistoryRoutes,
+  },
+  {
+    path: "/notifications",  
+    route: NotificationRoutes,
   }
 ];
 

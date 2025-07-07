@@ -203,6 +203,7 @@ const whereConditions =
           image: true,
           address: true,
           overallRating: true,
+          userId: true, 
         },
       },
       service: {

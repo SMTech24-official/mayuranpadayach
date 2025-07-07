@@ -6,16 +6,16 @@ import catchAsync from '../../../shared/catchAsync';
 import sendResponse from '../../../shared/sendResponse';
 
 const sendNotificationToUser = catchAsync(async (req: Request, res: Response) => {
-  const { deviceToken, title, body, userId } = req.body;
+  const { title, body, userId, deviceToken} = req.body;
 
-  if (!deviceToken || !title || !body || !userId) {
+  if ( !title || !body || !userId) {
     return res.status(httpStatus.BAD_REQUEST).json({
       success: false,
       message: 'Device token, title, and body are required',
     });
   }
 
-  await notificationService.sendNotification(deviceToken, title, body, userId);
+  await notificationService.sendNotification( title, body, userId, deviceToken);
 
   sendResponse(res, {
     statusCode: httpStatus.OK,
