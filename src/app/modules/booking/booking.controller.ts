@@ -88,6 +88,17 @@ const updateBooking = catchAsync(async (req, res) => {
   });
 });
 
+const bookingStatusChange = catchAsync(async (req, res) => {
+  const data = req.body;
+  const result = await bookingService.bookingStatusChangeDb(req.params.id, data);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Booking status updated successfully',
+    data: result,
+  });
+});
+
 const deleteBooking = catchAsync(async (req, res) => {
   const result = await bookingService.deleteItemFromDb(req.params.id);
   sendResponse(res, {
@@ -105,5 +116,6 @@ export const bookingController = {
   getListForUser,
   getBookingById,
   updateBooking,
+  bookingStatusChange,
   deleteBooking,
 };

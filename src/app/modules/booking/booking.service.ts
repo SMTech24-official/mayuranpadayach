@@ -3,6 +3,8 @@ import ApiError from "../../../errors/ApiErrors";
 import prisma from "../../../shared/prisma";
 import { IPaginationOptions } from "../../../interfaces/paginations";
 import { paginationHelper } from "../../../helpars/paginationHelper";
+import e from "express";
+import { UserStatus } from "@prisma/client";
 
 
 const getTimeSlotsFromDb = async (serviceId: string, startTime?: Date, endTime?: Date) => {
@@ -283,34 +285,83 @@ const updateIntoDb = async (id: string, data: any) => {
       throw new ApiError(httpStatus.NOT_FOUND, 'Booking not found');
     }
 
-    await prisma.timeSlot.deleteMany({
-      where: { bookingId: id },
+    console.log("existingBooking", existingBooking);
+
+    const deleteTimeSlots = await prisma.timeSlot.updateMany({
+      where: { bookingId: existingBooking.id, isDeleted: false },
+      data: { isDeleted: true, updatedAt: new Date() },
     });
+    if (!deleteTimeSlots) {
+      throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, 'Failed to delete existing time slots');
+    }
+    console.log("deleteTimeSlots", deleteTimeSlots);
+
+    console.log("serviceId", existingBooking.serviceId);
+    const existingService = await prisma.service.findUnique({
+      where: { id: existingBooking.serviceId},
+    });
+    if (!existingService) {
+      throw new ApiError(httpStatus.NOT_FOUND, 'Service not found');
+    }
+
+    console.log("existingService", existingService);
+    const timeSlots = data.timeSlot;
+    // Conflict check (for each slot)
+    for (const slot of timeSlots) {
+      const startTime = new Date(slot.startTime);
+      const endTime = new Date(slot.endTime);
+
+      if (startTime >= endTime) {
+        throw new ApiError(httpStatus.BAD_REQUEST, 'Start time must be before end time');
+      }
+
+      const conflicts = await getTimeSlotsFromDb(existingService.id, startTime, endTime);
+      if (conflicts.length > 0) {
+        throw new ApiError(httpStatus.CONFLICT, `Time slot is already booked`);
+      }
+    }
     // Update booking with new data
     const updatedBooking = await prisma.booking.update({
       where: { id, isDeleted: false },
       data: {
         bookingStatus: data.bookingStatus || existingBooking.bookingStatus,
         bookingDate: data.bookingDate || existingBooking.bookingDate,
-        serviceId: data.serviceId || existingBooking.serviceId,
-        specialistId: data.specialistId || existingBooking.specialistId,
         totalPrice: data.totalPrice || existingBooking.totalPrice,
-        status: data.status || existingBooking.status,
-        // timeSlot: {
-        //   create: data.timeSlot.map((slot: any) => ({
-        //     serviceId: data.serviceId || existingBooking.serviceId,
-        //     startTime: new Date(slot.startTime),
-        //     endTime: new Date(slot.endTime),
-        //   })),
-        // },
+        timeSlot: {
+          create: data.timeSlot.map((slot: any) => ({
+            startTime: new Date(slot.startTime),
+            endTime: new Date(slot.endTime),
+          })),
+        },
       },
     });
 
-    return {message: 'Booking updated successfully'};
+    return {message: 'Booking updated successfully', updatedBooking};
   });
 
   return transaction;
 };
+
+const bookingStatusChangeDb = async (id: string, data: any) => {
+  const existingBooking = await prisma.booking.findUnique({
+    where: { id, isDeleted: false },
+  });
+
+  if (!existingBooking) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Booking not found');
+  }
+
+  await prisma.booking.update({
+    where: { id, isDeleted: false },
+    data: {
+      bookingStatus: data.status || existingBooking.bookingStatus,
+      updatedAt: new Date(),
+    },
+  });
+
+  return { message: 'Booking status updated successfully' };
+}
+
 
 const deleteItemFromDb = async (id: string) => {
   const transaction = await prisma.$transaction(async (prisma) => {
@@ -336,6 +387,7 @@ getListFromDb,
 getListForUserDB,
 getByIdFromDb,
 updateIntoDb,
+bookingStatusChangeDb,
 deleteItemFromDb,
 getTimeSlotsFromDb
 };

@@ -33,8 +33,14 @@ router.get('/:id', auth(), bookingController.getBookingById);
 router.put(
 '/:id',
 auth(),
-validateRequest(bookingValidation.updateSchema),
+//validateRequest(bookingValidation.updateSchema),
 bookingController.updateBooking,
+);
+
+router.patch(
+'/status/:id',
+auth(),
+bookingController.bookingStatusChange,
 );
 
 router.delete('/:id', auth(UserRole.ADMIN), bookingController.deleteBooking);
