@@ -239,36 +239,45 @@ const whereConditions =
 
 const getByIdFromDb = async (id: string) => {
   
-    const result = await prisma.booking.findUnique({ where: { id },
-    include: {
+    const result = await prisma.booking.findUnique({
+      where: { id },
+      include: {
       user: {
         select: {
-          fullName: true,
-          profileImage: true,
+        fullName: true,
+        profileImage: true,
         },
       },
       business: {
         select: {
-          name: true,
-          image: true,
-          address: true,
-          overallRating: true,
+        name: true,
+        image: true,
+        address: true,
+        overallRating: true,
         },
       },
       service: {
         select: {
-          name: true,
-          price: true,
+        name: true,
+        price: true,
         },
       },
       specialist: {
         select: {
-          fullName: true,
-          profileImage: true,
-          specialization: true,
+        fullName: true,
+        profileImage: true,
+        specialization: true,
         },
       },
-    }, });
+      timeSlot: {
+        where: { isDeleted: false },
+        select: {
+        startTime: true,
+        endTime: true,
+        },
+      },
+      },
+    });
     if (!result) {
       throw new ApiError(httpStatus.NOT_FOUND,'Booking not found');
     }
