@@ -294,7 +294,6 @@ const updateIntoDb = async (id: string, data: any) => {
       throw new ApiError(httpStatus.NOT_FOUND, 'Booking not found');
     }
 
-    console.log("existingBooking", existingBooking);
 
     const deleteTimeSlots = await prisma.timeSlot.updateMany({
       where: { bookingId: existingBooking.id, isDeleted: false },
@@ -303,17 +302,12 @@ const updateIntoDb = async (id: string, data: any) => {
     if (!deleteTimeSlots) {
       throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, 'Failed to delete existing time slots');
     }
-    console.log("deleteTimeSlots", deleteTimeSlots);
-
-    console.log("serviceId", existingBooking.serviceId);
     const existingService = await prisma.service.findUnique({
       where: { id: existingBooking.serviceId},
     });
     if (!existingService) {
       throw new ApiError(httpStatus.NOT_FOUND, 'Service not found');
     }
-
-    console.log("existingService", existingService);
     const timeSlots = data.timeSlot;
     // Conflict check (for each slot)
     for (const slot of timeSlots) {
@@ -338,6 +332,7 @@ const updateIntoDb = async (id: string, data: any) => {
         totalPrice: data.totalPrice || existingBooking.totalPrice,
         timeSlot: {
           create: data.timeSlot.map((slot: any) => ({
+            serviceId: existingService.id,
             startTime: new Date(slot.startTime),
             endTime: new Date(slot.endTime),
           })),
