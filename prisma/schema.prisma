@@ -24,6 +24,10 @@ model User {
   isAllowed       Boolean       @default(false)
   isDeleted         Boolean       @default(false)
   subscriptionEndsAt     DateTime?
+  paystackSubaccountUrl String? 
+  paystackSubaccountCode String? 
+  paystackCustomerCode String? 
+  paystackRecipientCode String?         // Paystack transfer recipient code for drivers
   createdAt         DateTime      @default(now())
   updatedAt         DateTime      @updatedAt
 
@@ -208,6 +212,7 @@ model Booking {
   status      UserStatus @default(ACTIVE)
   bookingStatus bookingStatus @default(PENDING)
   isDeleted Boolean @default(false)
+  payment    Payment[]  @relation()
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -301,6 +306,23 @@ model Notification {
 
   @@map("notifications")
 }
+
+model Payment {
+  id                        String           @id @default(auto()) @map("_id") @db.ObjectId
+  paymentId                 String           // Stores Paystack transaction reference
+  paymentAmount             Float
+  bookingId                 String           @unique @db.ObjectId
+  paymentDate               DateTime         @default(now())
+  paystackCustomerCodeProvider String?
+  paystackSubaccountCodeReceiver String? 
+  authorizationCode         String?          // Paystack authorization code for pre-authorized payments
+  status                    PaymentStatus    @default(PENDING)
+  createdAt                 DateTime         @default(now())
+  updatedAt                 DateTime         @updatedAt
+  booking                   Booking          @relation(fields: [bookingId], references: [id])
+
+  @@map("payments")
+}
 enum UserRole {
   ADMIN
   PROFESSIONAL
@@ -334,6 +356,7 @@ enum PaymentStatus {
   COMPLETED
   FAILED
   REQUIRES_CAPTURE
+  DEACTIVATED
 }
 
 enum SubscriptionStatus {

@@ -187,21 +187,40 @@ if (filterData.rating !== undefined) {
     include: {
       category: true,
       subCategory: true,
+      services: {
+      select: {
+        offeredPercent: true,
+      },
+    },
     },
   });
+
+  
 
   const total = await prisma.business.count({
     where: whereConditions,
   });
 
+  const resultWithOffer = result.map((business) => {
+  const highestOfferPercent = business.services?.length
+    ? Math.max(...business.services.map((s) => s.offeredPercent ?? 0))
+    : 0;
+
+  const { services, ...rest } = business;
+  return {
+    ...rest,
+    highestOfferPercent,
+  };
+});
   return {
     meta: {
       page,
       limit,
       total,
     },
-    data: result,
+    data: resultWithOffer,
   };
+
 };
 
 

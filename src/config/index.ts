@@ -21,5 +21,8 @@ export default {
         email: process.env.EMAIL,
         app_pass: process.env.APP_PASS
     },
+    paystack: {
+        secret_key: process.env.PAYSTACK_SECRET_KEY
+    }
 
 }

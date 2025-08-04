@@ -36,6 +36,7 @@
     "@types/jsonwebtoken": "^9.0.6",
     "aws": "^0.0.3-2",
     "aws-sdk": "^2.1692.0",
+    "axios": "^1.11.0",
     "bcrypt": "^5.1.1",
     "cloudinary": "^1.41.3",
     "cookie-parser": "^1.4.6",
