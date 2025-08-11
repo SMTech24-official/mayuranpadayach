@@ -35,6 +35,7 @@ const createIntoDb = async (req: any) => {
         name: parsedData.name,
         price: parsedData.price,
         businessId: business.id,
+        interval: parsedData.interval,
         image: image || "",
       },
   });
@@ -133,6 +134,7 @@ const updateIntoDb = async ( req: any) => {
         description: parsedData.description || existingService.description,
         price: parsedData.price || existingService.price,
         image: image || existingService.image,
+        interval: parsedData.interval || existingService.interval,
         isActive: parsedData.isActive || existingService.isActive,
         isOffered: parsedData.isOffered || existingService.isOffered,
         offeredPercent: parsedData.offeredPercent || existingService.offeredPercent,
