@@ -206,6 +206,8 @@ const whereConditions =
           image: true,
           address: true,
           overallRating: true,
+          openingHours: true,
+          closingHours: true,
           userId: true, 
         },
       },
@@ -256,6 +258,8 @@ const getByIdFromDb = async (id: string) => {
         image: true,
         address: true,
         overallRating: true,
+        openingHours: true,
+        closingHours: true,
         },
       },
       service: {
