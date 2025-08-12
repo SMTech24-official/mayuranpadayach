@@ -123,6 +123,7 @@ const getListFromDb = async (options: IPaginationOptions) => {
         select: {
           name: true,
           price: true,
+          interval: true,
         },
       },
     }
@@ -212,6 +213,7 @@ const whereConditions =
         select: {
           name: true,
           price: true,
+          interval: true,
         },
       },
       specialist: {
@@ -260,6 +262,7 @@ const getByIdFromDb = async (id: string) => {
         select: {
         name: true,
         price: true,
+        interval: true,
         },
       },
       specialist: {

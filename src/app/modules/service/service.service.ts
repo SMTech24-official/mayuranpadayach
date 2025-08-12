@@ -4,9 +4,6 @@ import { fileUploader } from "../../../helpars/fileUploader";
 import prisma from "../../../shared/prisma";
 import { IPaginationOptions } from "../../../interfaces/paginations";
 import { paginationHelper } from "../../../helpars/paginationHelper";
-
-
-
 const createIntoDb = async (req: any) => {
   const transaction = await prisma.$transaction(async (prisma) => {
     const data = req.body.data;
