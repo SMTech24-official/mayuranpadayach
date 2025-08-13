@@ -15,7 +15,7 @@ import { reviewRoutes } from "../modules/review/review.routes";
 import { bookingRoutes } from "../modules/booking/booking.routes";
 import { searchHistoryRoutes } from "../modules/searchHistory/searchHistory.routes";
 import { NotificationRoutes } from "../modules/notification/notification.routes";
-import { paymentRoutes } from "../modules/payment/payment.routes";
+import { PaymentRoutes } from "../modules/payment/payment.routes";
 
 
 
@@ -88,7 +88,7 @@ const moduleRoutes = [
   },
   {
     path: "/payment",  
-    route: paymentRoutes,
+    route: PaymentRoutes,
   }
 ];
 

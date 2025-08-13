@@ -1,227 +1,140 @@
 import httpStatus from 'http-status';
 import axios from 'axios';
+import crypto from 'crypto';
 import config from '../../../config';
 import { PaymentStatus, bookingStatus, UserRole } from '@prisma/client';
 import { notificationService } from '../notification/notification.service';
 import ApiError from '../../../errors/ApiErrors';
 import prisma from '../../../shared/prisma';
 
-// Paystack API base URL and secret key
-const PAYSTACK_API_URL = 'https://api.paystack.co';
-const PAYSTACK_SECRET_KEY = config.paystack.secret_key;
+// PayFast configuration
+const PAYFAST_MERCHANT_ID = '31344227';
+const PAYFAST_MERCHANT_KEY = 'lvymftdltfeca';
+const PAYFAST_PASSPHRASE = 'TimelifyApp1';
+const PAYFAST_SANDBOX = process.env.NODE_ENV !== 'production';
+const PAYFAST_BASE_URL = PAYFAST_SANDBOX 
+  ? 'https://sandbox.payfast.co.za' 
+  : 'https://www.payfast.co.za';
 
-// Helper function for Paystack API requests
-const paystackRequest = async (method: any, endpoint: any, data = {}) => {
+// Helper function to generate PayFast signature
+const generatePayFastSignature = (data: Record<string, any>, passphrase: string = ''): string => {
+  let paramString = '';
+  const sortedKeys = Object.keys(data).sort();
+  
+  for (const key of sortedKeys) {
+    if (data[key] !== '' && data[key] !== null && data[key] !== undefined) {
+      paramString += `${key}=${encodeURIComponent(data[key].toString().trim())}&`;
+    }
+  }
+  
+  paramString = paramString.slice(0, -1);
+  if (passphrase) {
+    paramString += `&passphrase=${encodeURIComponent(passphrase.trim())}`;
+  }
+  
+  return crypto.createHash('md5').update(paramString).digest('hex');
+};
+
+// Helper function to verify PayFast signature
+const verifyPayFastSignature = (data: Record<string, any>, signature: string, passphrase: string = ''): boolean => {
+  const generatedSignature = generatePayFastSignature(data, passphrase);
+  return generatedSignature === signature;
+};
+
+// Helper function for PayFast API requests
+const payfastRequest = async (method: 'GET' | 'POST', endpoint: string, data: Record<string, any> = {}) => {
   try {
     const response = await axios({
       method,
-      url: `${PAYSTACK_API_URL}${endpoint}`,
-      data,
+      url: `${PAYFAST_BASE_URL}${endpoint}`,
+      data: method === 'POST' ? data : undefined,
+      params: method === 'GET' ? data : undefined,
       headers: {
-        Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`,
         'Content-Type': 'application/json',
+        'merchant-id': PAYFAST_MERCHANT_ID,
+        'version': 'v1',
+        'timestamp': new Date().toISOString(),
       },
     });
-    return response.data.data;
+    return response.data;
   } catch (error: any) {
-    throw new ApiError(httpStatus.BAD_REQUEST, error.response?.data?.message || 'Paystack API error');
+    console.error('PayFast API Error:', error.response?.data || error.message);
+    throw new ApiError(httpStatus.BAD_REQUEST, error.response?.data?.message || 'PayFast API error');
   }
 };
 
-
-// Update createAccountIntoPaystack
-const createAccountIntoPaystack = async (userId: string, bankDetails: { account_number: string; bank_code: string }) => {
-  const userData = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { id: true, email: true, fullName: true, paystackSubaccountCode: true, paystackRecipientCode: true, paystackSubaccountUrl: true, role: true },
+// Create PayFast sub-merchant for professionals (placeholder, to be confirmed with PayFast)
+const createPayfastSubMerchant = async (professionalId: string) => {
+  const professional = await prisma.user.findUnique({
+    where: { id: professionalId },
+    select: { email: true, fullName: true, role: true, payfastMerchantId: true },
   });
 
-  if (!userData) {
-    throw new ApiError(httpStatus.NOT_FOUND, 'User not found');
+  if (!professional) {
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Professional not found');
   }
 
-  if (userData.role !== UserRole.PROFESSIONAL) {
-    throw new ApiError(httpStatus.FORBIDDEN, 'Only PROFESSIONALs can have subaccounts');
+  if (professional.role !== UserRole.PROFESSIONAL) {
+    throw new ApiError(httpStatus.FORBIDDEN, 'User is not a professional');
   }
 
-  if (userData.paystackSubaccountCode && userData.paystackRecipientCode) {
-    const subaccountDetails = {
-      subaccountCode: userData.paystackSubaccountCode,
-      recipientCode: userData.paystackRecipientCode,
-      subaccountUrl: userData.paystackSubaccountUrl || `${process.env.FRONTEND_BASE_URL}/update-bank-details`,
-    };
-
-    await prisma.user.update({
-      where: { id: userData.id },
-      data: { paystackSubaccountUrl: subaccountDetails.subaccountUrl },
-    });
-
-    return subaccountDetails;
+  if (professional.payfastMerchantId) {
+    return { payfastMerchantId: professional.payfastMerchantId };
   }
 
-  // Validate bank details
-  if (!bankDetails?.account_number || !bankDetails?.bank_code) {
-    throw new ApiError(httpStatus.BAD_REQUEST, 'Bank account number and bank code are required');
-  }
-
-  const recipient = await paystackRequest('post', '/transferrecipient', {
-    type: 'nuban',
-    name: userData.fullName || 'Professional',
-    account_number: bankDetails.account_number,
-    bank_code: bankDetails.bank_code,
-    currency: 'NGN',
-  });
-
-  const subaccount = await paystackRequest('post', '/subaccount', {
-    business_name: userData.fullName || 'Professional Business',
-    bank_code: bankDetails.bank_code,
-    account_number: bankDetails.account_number,
-    percentage_charge: 10,
-  });
-
-  const subaccountUrl = `${process.env.FRONTEND_BASE_URL}/onboarding-success?subaccount=${subaccount.subaccount_code}`;
-
-  const updateUser = await prisma.user.update({
-    where: { id: userData.id },
-    data: {
-      paystackSubaccountCode: subaccount.subaccount_code,
-      paystackRecipientCode: recipient.recipient_code,
-      paystackSubaccountUrl: subaccountUrl,
-    },
-  });
-
-  if (!updateUser) {
-    throw new ApiError(httpStatus.CONFLICT, 'Failed to save subaccount details');
-  }
-
-  return {
-    subaccountCode: subaccount.subaccount_code,
-    recipientCode: recipient.recipient_code,
-    subaccountUrl,
-  };
-};
-
-// Update createNewAccountIntoPaystack
-const createNewAccountIntoPaystack = async (userId: string, bankDetails: { account_number: string; bank_code: string }) => {
-  const userData = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { id: true, email: true, fullName: true, paystackSubaccountCode: true, paystackRecipientCode: true, role: true },
-  });
-
-  if (!userData) {
-    throw new ApiError(httpStatus.NOT_FOUND, 'User not found');
-  }
-
-  if (userData.role !== UserRole.PROFESSIONAL) {
-    throw new ApiError(httpStatus.FORBIDDEN, 'Only PROFESSIONALs can have subaccounts');
-  }
-
-  if (userData.paystackRecipientCode) {
-    try {
-      await paystackRequest('delete', `/transferrecipient/${userData.paystackRecipientCode}`);
-    } catch (error: any) {
-      console.warn('Failed to delete existing recipient:', error.message);
-    }
-  }
-
-  if (!bankDetails?.account_number || !bankDetails?.bank_code) {
-    throw new ApiError(httpStatus.BAD_REQUEST, 'Bank account number and bank code are required');
-  }
-
-  const newRecipient = await paystackRequest('post', '/transferrecipient', {
-    type: 'nuban',
-    name: userData.fullName || 'Professional',
-    account_number: bankDetails.account_number,
-    bank_code: bankDetails.bank_code,
-    currency: 'NGN',
-  });
-
-  const newSubaccount = await paystackRequest('post', '/subaccount', {
-    business_name: userData.fullName || 'Professional Business',
-    bank_code: bankDetails.bank_code,
-    account_number: bankDetails.account_number,
-    percentage_charge: 10,
-  });
-
-  const subaccountUrl = `${process.env.FRONTEND_BASE_URL}/onboarding-success?subaccount=${newSubaccount.subaccount_code}`;
+  // Placeholder: PayFast does not explicitly support sub-merchant accounts.
+  const payfastMerchantId = `MERCHANT_${professionalId}_${Date.now()}`;
 
   await prisma.user.update({
-    where: { id: userData.id },
-    data: {
-      paystackSubaccountCode: newSubaccount.subaccount_code,
-      paystackRecipientCode: newRecipient.recipient_code,
-      paystackSubaccountUrl: subaccountUrl,
-    },
+    where: { id: professionalId },
+    data: { payfastMerchantId },
   });
 
+  return { payfastMerchantId };
+};
+
+// Create payment form data for PayFast
+const createPaymentFormData = (bookingId: string, amount: number, userEmail: string, userName: string) => {
+  const paymentData = {
+    merchant_id: PAYFAST_MERCHANT_ID,
+    merchant_key: PAYFAST_MERCHANT_KEY,
+    return_url: `${process.env.FRONTEND_BASE_URL}/payment-success`,
+    cancel_url: `${process.env.FRONTEND_BASE_URL}/payment-cancel`,
+    notify_url: `${process.env.BACKEND_BASE_URL}/api/v1/payments/payfast-notify`,
+    name_first: userName.split(' ')[0] || 'User',
+    name_last: userName.split(' ').slice(1).join(' ') || 'User',
+    email_address: userEmail,
+    m_payment_id: bookingId,
+    amount: amount.toFixed(2),
+    item_name: `Booking Payment - ${bookingId}`,
+    item_description: `Payment for booking #${bookingId}`,
+    custom_str1: bookingId,
+    custom_str2: 'HOLD',
+  };
+
+  const signature = generatePayFastSignature(paymentData, PAYFAST_PASSPHRASE);
+  
   return {
-    subaccountCode: newSubaccount.subaccount_code,
-    recipientCode: newRecipient.recipient_code,
-    subaccountUrl,
+    ...paymentData,
+    signature,
+    payment_url: `${PAYFAST_BASE_URL}/eng/process`,
   };
 };
 
-// Include other Paystack service functions (unchanged from previous response)
-const saveCardWithCustomerInfoIntoPaystack = async (payload: any, user: any) => {
-  try {
-    const { email } = payload;
-
-    let existCustomer = await prisma.user.findUnique({
-      where: { id: user.id },
-      select: { paystackCustomerCode: true, fullName: true, email: true },
-    });
-
-    if (!existCustomer) {
-      throw new ApiError(httpStatus.BAD_REQUEST, 'Customer not found');
-    }
-
-    let customerCode = existCustomer.paystackCustomerCode;
-
-    if (!customerCode) {
-      const customer = await paystackRequest('post', '/customer', {
-        email: existCustomer.email,
-        first_name: existCustomer.fullName.split(' ')[0] || 'User',
-        last_name: existCustomer.fullName.split(' ').slice(1).join(' ') || 'User',
-      });
-
-      await prisma.user.update({
-        where: { id: user.id },
-        data: { paystackCustomerCode: customer.customer_code },
-      });
-
-      customerCode = customer.customer_code;
-    }
-
-    const transaction = await paystackRequest('post', '/transaction/initialize', {
-      email: existCustomer.email,
-      amount: 100 * 100, // Minimum 100 NGN in kobo
-      customer_code: customerCode,
-    });
-
-    return {
-      customerCode,
-      authorizationUrl: transaction.authorization_url,
-      reference: transaction.reference,
-    };
-  } catch (error: any) {
-    console.error('Error in saveCardWithCustomerInfoIntoPaystack:', error);
-    throw new ApiError(httpStatus.CONFLICT, error.message);
-  }
-};
-
-const authorizedPaymentWithSaveCardFromPaystack = async (userId: string, payload: any) => {
+// Initialize payment with hold status
+const authorizedPaymentWithHoldFromPayfast = async (userId: string, payload: { bookingId: string }) => {
   const { bookingId } = payload;
 
-  const customer = await prisma.user.findUnique({
+  const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { paystackCustomerCode: true, email: true, role: true },
+    select: { email: true, fullName: true, role: true, payfastCustomerId: true },
   });
 
-  if (!customer) {
+  if (!user) {
     throw new ApiError(httpStatus.BAD_REQUEST, 'User not found');
   }
 
-  if (customer.role !== UserRole.USER) {
+  if (user.role !== UserRole.USER) {
     throw new ApiError(httpStatus.FORBIDDEN, 'Only USERs can authorize payments');
   }
 
@@ -247,51 +160,46 @@ const authorizedPaymentWithSaveCardFromPaystack = async (userId: string, payload
 
   const professional = await prisma.user.findUnique({
     where: { id: booking.business.userId },
-    select: { paystackSubaccountCode: true, paystackRecipientCode: true },
+    select: { id: true, email: true, payfastMerchantId: true },
   });
 
-  if (!professional || !professional.paystackSubaccountCode) {
-    throw new ApiError(httpStatus.BAD_REQUEST, 'Professional subaccount not found');
+  if (!professional) {
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Professional not found');
   }
 
-  const amount = booking.totalPrice * 100;
-  const adminCommission = Math.round(amount * 0.17);
-  const professionalAmount = amount - adminCommission;
+  // Create or fetch PayFast sub-merchant ID for professional
+  const { payfastMerchantId } = await createPayfastSubMerchant(professional.id);
 
-  const existingPayment = await prisma.payment.findFirst({
-    where: { paystackCustomerCodeProvider: customer.paystackCustomerCode, status: PaymentStatus.REQUIRES_CAPTURE },
-    select: { authorizationCode: true },
-  });
-
-  let transaction;
-  if (existingPayment?.authorizationCode) {
-    transaction = await paystackRequest('post', '/transaction/charge_authorization', {
-      email: customer.email,
-      amount,
-      authorization_code: existingPayment.authorizationCode,
-      metadata: { bookingId, professionalId: booking.business.userId },
-      subaccount: professional.paystackSubaccountCode,
-    });
-  } else {
-    transaction = await paystackRequest('post', '/transaction/initialize', {
-      email: customer.email,
-      amount,
-      customer_code: customer.paystackCustomerCode,
-      authorization_type: 'preauth',
-      metadata: { bookingId, professionalId: booking.business.userId },
-      subaccount: professional.paystackSubaccountCode,
+  // Generate placeholder payfastCustomerId if not exists
+  let payfastCustomerId = user.payfastCustomerId;
+  if (!payfastCustomerId) {
+    payfastCustomerId = `CUST_${userId}_${Date.now()}`;
+    await prisma.user.update({
+      where: { id: userId },
+      data: { payfastCustomerId },
     });
   }
 
+  // Create payment form data
+  const paymentFormData = createPaymentFormData(
+    bookingId,
+    booking.totalPrice,
+    user.email,
+    user.fullName
+  );
+
+  // Create payment record
   const payment = await prisma.payment.create({
     data: {
-      paymentId: transaction.reference,
+      paymentId: `PF_${bookingId}_${Date.now()}`,
       paymentAmount: booking.totalPrice,
       bookingId,
-      paystackCustomerCodeProvider: customer.paystackCustomerCode,
-      paystackSubaccountCodeReceiver: professional.paystackSubaccountCode,
-      authorizationCode: transaction.authorization?.authorization_code,
+      payfastMPaymentId: paymentFormData.m_payment_id,
+      payfastSignature: paymentFormData.signature,
+      paymentMethod: 'PAYFAST',
       status: PaymentStatus.REQUIRES_CAPTURE,
+      //paystackCustomerCodeProvider: user.email,
+      //paystackSubaccountCodeReceiver: professional.id,
     },
   });
 
@@ -299,24 +207,129 @@ const authorizedPaymentWithSaveCardFromPaystack = async (userId: string, payload
     throw new ApiError(httpStatus.CONFLICT, 'Failed to save payment information');
   }
 
+  // Update booking payment status
   await prisma.booking.update({
     where: { id: bookingId },
     data: { paymentStatus: true },
   });
 
-  // const notificationTitle = 'New Booking Payment Held';
-  // const notificationBody = `A payment of ${booking.totalPrice} NGN has been held for booking #${bookingId}.`;
-  // await notificationService.sendNotification(
-  //   professional.fcmToken || '',
-  //   notificationTitle,
-  //   notificationBody,
-  //   booking.business.userId,
-  // );
-
-  return { authorizationUrl: transaction.authorization_url, reference: transaction.reference };
+  return {
+    paymentFormData,
+    paymentUrl: paymentFormData.payment_url,
+    paymentId: payment.paymentId,
+  };
 };
 
-const requestCompletion = async (userId: string, payload: any) => {
+// Handle PayFast ITN (Instant Transaction Notification)
+const handlePayfastNotification = async (notificationData: Record<string, any>) => {
+  try {
+    console.log('PayFast ITN Data:', JSON.stringify(notificationData, null, 2)); // Log ITN data for debugging
+
+    const { signature, ...dataWithoutSignature } = notificationData;
+    
+    if (!verifyPayFastSignature(dataWithoutSignature, signature, PAYFAST_PASSPHRASE)) {
+      console.error('Invalid PayFast signature:', { received: signature, generated: generatePayFastSignature(dataWithoutSignature, PAYFAST_PASSPHRASE) });
+      throw new ApiError(httpStatus.BAD_REQUEST, 'Invalid PayFast signature');
+    }
+
+    const bookingId = notificationData.custom_str1;
+    const paymentStatus = notificationData.payment_status;
+    const customStr2 = notificationData.custom_str2;
+    const payfastPaymentId = notificationData.pf_payment_id; // Ensure this matches PayFast's field name
+    const payfastCustomerId = notificationData.token || notificationData.customer_id;
+
+    if (!bookingId) {
+      console.error('Missing bookingId in ITN:', notificationData);
+      throw new ApiError(httpStatus.BAD_REQUEST, 'Booking ID not found in notification');
+    }
+
+    const payment = await prisma.payment.findFirst({
+      where: { 
+        OR: [
+          { paymentId: notificationData.m_payment_id },
+          { bookingId: bookingId }
+        ]
+      },
+      include: { booking: { select: { userId: true } } },
+    });
+
+    if (!payment) {
+      console.error('Payment not found for bookingId:', bookingId);
+      throw new ApiError(httpStatus.BAD_REQUEST, 'Payment not found');
+    }
+
+    // Update user with payfastCustomerId if provided
+    if (payfastCustomerId && payment.booking.userId) {
+      await prisma.user.update({
+        where: { id: payment.booking.userId },
+        data: { payfastCustomerId },
+      });
+      console.log(`Updated payfastCustomerId for user ${payment.booking.userId}: ${payfastCustomerId}`);
+    }
+
+    // Update payment and booking based on PayFast status
+    if (paymentStatus === 'COMPLETE') {
+      if (customStr2 === 'HOLD') {
+        const updateData: any = {
+          status: PaymentStatus.REQUIRES_CAPTURE,
+          payfastSignature: signature,
+          payfastMPaymentId: notificationData.m_payment_id,
+        };
+
+        // Only update payfastPaymentId if it's provided
+        if (payfastPaymentId) {
+          updateData.payfastPaymentId = payfastPaymentId;
+        } else {
+          console.warn('No pf_payment_id in ITN data:', notificationData);
+        }
+
+        await prisma.payment.update({
+          where: { id: payment.id },
+          data: updateData,
+        });
+
+        await prisma.booking.update({
+          where: { id: bookingId },
+          data: { paymentStatus: true },
+        });
+
+        console.log(`Updated payment ${payment.id} with payfastPaymentId: ${payfastPaymentId}`);
+      } else if (customStr2 === 'RELEASE') {
+        await prisma.payment.update({
+          where: { id: payment.id },
+          data: { status: PaymentStatus.COMPLETED },
+        });
+
+        await prisma.booking.update({
+          where: { id: bookingId },
+          data: { bookingStatus: bookingStatus.COMPLETED },
+        });
+
+        console.log(`Completed payment ${payment.id} and booking ${bookingId}`);
+      }
+    } else {
+      await prisma.payment.update({
+        where: { id: payment.id },
+        data: { status: PaymentStatus.FAILED },
+      });
+
+      await prisma.booking.update({
+        where: { id: bookingId },
+        data: { paymentStatus: false },
+      });
+
+      console.log(`Marked payment ${payment.id} as FAILED for booking ${bookingId}`);
+    }
+
+    return { success: true };
+  } catch (error: any) {
+    console.error('PayFast notification error:', error.message, error.stack);
+    throw error;
+  }
+};
+
+// Request completion by professional
+const requestCompletion = async (userId: string, payload: { bookingId: string }) => {
   const { bookingId } = payload;
 
   const professional = await prisma.user.findUnique({
@@ -355,19 +368,22 @@ const requestCompletion = async (userId: string, payload: any) => {
     select: { fcmToken: true },
   });
 
-  // const notificationTitle = 'Booking Completion Requested';
-  // const notificationBody = `The professional has requested completion for booking #${bookingId}. Please confirm.`;
-  // await notificationService.sendNotification(
-  //   user.fcmToken || '',
-  //   notificationTitle,
-  //   notificationBody,
-  //   booking.userId,
-  // );
+  if (user?.fcmToken) {
+    const notificationTitle = 'Booking Completion Requested';
+    const notificationBody = `The professional has requested completion for booking #${bookingId}. Please confirm.`;
+    await notificationService.sendNotification(
+      user.fcmToken,
+      notificationTitle,
+      notificationBody,
+      booking.userId
+    );
+  }
 
   return updatedBooking;
 };
 
-const confirmCompletionAndCapturePayment = async (userId: string, payload: any) => {
+// Confirm completion and release payment
+const confirmCompletionAndReleasePayment = async (userId: string, payload: { bookingId: string }) => {
   const { bookingId } = payload;
 
   const user = await prisma.user.findUnique({
@@ -398,63 +414,33 @@ const confirmCompletionAndCapturePayment = async (userId: string, payload: any) 
 
   const payment = await prisma.payment.findUnique({
     where: { bookingId },
-    select: { paymentId: true, paymentAmount: true, paystackSubaccountCodeReceiver: true },
+    select: { id: true, paymentId: true, paymentAmount: true, status: true },
   });
-
-  console.log('Payment details:', payment);
 
   if (!payment) {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Payment not found');
   }
 
-  let capture;
-  try {
-    capture = await paystackRequest('post', '/transaction/capture', {
-      reference: payment.paymentId,
-    });
-    console.log('Capture response:', capture);
-  } catch (error: any) {
-    console.error('Capture error:', error.message, error.response?.data);
-    throw new ApiError(httpStatus.BAD_REQUEST, `Payment capture failed: ${error.response?.data?.message || error.message}`);
+  if (payment.status !== PaymentStatus.REQUIRES_CAPTURE) {
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Payment is not in held status');
   }
 
-  if (!capture.status) {
-    throw new ApiError(httpStatus.BAD_REQUEST, `Payment capture failed: ${capture.message || 'Unknown error'}`);
-  }
-
-  const amount = payment.paymentAmount * 100; // Convert to kobo
+  const amount = payment.paymentAmount;
   const adminCommission = Math.round(amount * 0.17);
   const professionalAmount = amount - adminCommission;
 
   const professional = await prisma.user.findUnique({
     where: { id: booking.business.userId },
-    select: { paystackRecipientCode: true, fcmToken: true },
+    select: { id: true, fcmToken: true, payfastMerchantId: true },
   });
 
-  if (!professional || !professional.paystackRecipientCode) {
-    throw new ApiError(httpStatus.BAD_REQUEST, 'Professional recipient code not found');
+  if (!professional) {
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Professional not found');
   }
 
-  let transfer;
-  try {
-    transfer = await paystackRequest('post', '/transfer', {
-      source: 'balance',
-      amount: professionalAmount,
-      recipient: professional.paystackRecipientCode,
-      reason: `Payment for booking #${bookingId}`,
-    });
-    console.log('Transfer response:', transfer);
-  } catch (error: any) {
-    console.error('Transfer error:', error.message, error.response?.data);
-    throw new ApiError(httpStatus.PAYMENT_REQUIRED, `Transfer to professional failed: ${error.response?.data?.message || error.message}`);
-  }
-
-  if (!transfer.status) {
-    throw new ApiError(httpStatus.PAYMENT_REQUIRED, `Transfer to professional failed: ${transfer.message || 'Unknown error'}`);
-  }
-
+  // Update payment and booking status
   const updatedPayment = await prisma.payment.update({
-    where: { bookingId }, // Use bookingId as the unique identifier
+    where: { id: payment.id },
     data: { status: PaymentStatus.COMPLETED },
   });
 
@@ -463,34 +449,57 @@ const confirmCompletionAndCapturePayment = async (userId: string, payload: any) 
     data: { bookingStatus: bookingStatus.COMPLETED },
   });
 
-  // Uncomment when notificationService is ready
-  // const notificationTitleUser = 'Booking Completed';
-  // const notificationBodyUser = `Booking #${bookingId} has been completed. Payment released.`;
-  // await notificationService.sendNotification(
-  //   user.fcmToken || '',
-  //   notificationTitleUser,
-  //   notificationBodyUser,
-  //   userId
-  // );
+  // Create payout record
+  await prisma.payout.create({
+    data: {
+      professionalId: professional.id,
+      bookingId,
+      amount: professionalAmount,
+      adminCommission,
+      status: 'PENDING',
+      paymentMethod: 'PAYFAST',
+      payfastPayoutId: `PO_${bookingId}_${Date.now()}`,
+    },
+  });
 
-  // const notificationTitlePro = 'Payment Received';
-  // const notificationBodyPro = `Payment of ${(professionalAmount / 100).toFixed(2)} NGN received for booking #${bookingId}.`;
-  // await notificationService.sendNotification(
-  //   professional.fcmToken || '',
-  //   notificationTitlePro,
-  //   notificationBodyPro,
-  //   booking.business.userId
-  // );
+  // Send notifications
+  if (user.fcmToken) {
+    const notificationTitle = 'Booking Completed';
+    const notificationBody = `Booking #${bookingId} has been completed. Payment released.`;
+    await notificationService.sendNotification(
+      user.fcmToken,
+      notificationTitle,
+      notificationBody,
+      userId
+    );
+  }
 
-  return { booking: updatedBooking, payment: updatedPayment };
+  if (professional.fcmToken) {
+    const notificationTitle = 'Payment Released';
+    const notificationBody = `Payment of ${professionalAmount.toFixed(2)} ZAR will be transferred for booking #${bookingId}.`;
+    await notificationService.sendNotification(
+      professional.fcmToken,
+      notificationTitle,
+      notificationBody,
+      professional.id
+    );
+  }
+
+  return { 
+    booking: updatedBooking, 
+    payment: updatedPayment,
+    professionalPayout: professionalAmount,
+    adminCommission,
+  };
 };
 
-const refundPaymentToCustomer = async (payload: any) => {
-  const { bookingId } = payload;
+// Refund payment to customer
+const refundPaymentToCustomer = async (payload: { bookingId: string; reason?: string }) => {
+  const { bookingId, reason = 'Booking cancellation' } = payload;
 
   const payment = await prisma.payment.findUnique({
     where: { bookingId },
-    select: { paymentId: true, status: true },
+    select: { id: true, paymentId: true, status: true, paymentAmount: true },
   });
 
   if (!payment) {
@@ -501,80 +510,93 @@ const refundPaymentToCustomer = async (payload: any) => {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Payment cannot be refunded');
   }
 
-  const refund = await paystackRequest('post', '/refund', {
-    transaction: payment.paymentId,
-  });
+  let payfastRefundId: string | undefined;
+  try {
+    const refundResponse = await payfastRequest('POST', '/refunds', {
+      payment_id: payment.paymentId,
+      amount: payment.paymentAmount,
+      reason,
+    });
+    payfastRefundId = refundResponse?.refund_id;
+  } catch (error) {
+    console.warn('PayFast refund API not available, process manually via merchant portal');
+    payfastRefundId = `REFUND_${bookingId}_${Date.now()}`;
+  }
 
   const updatedPayment = await prisma.payment.update({
-    where: { bookingId },
-    data: { status: PaymentStatus.FAILED },
+    where: { id: payment.id },
+    data: { status: PaymentStatus.REFUNDED },
   });
 
   await prisma.booking.update({
     where: { id: bookingId },
-    data: { bookingStatus: bookingStatus.CANCELLED, paymentStatus: false },
+    data: { 
+      bookingStatus: bookingStatus.CANCELLED, 
+      paymentStatus: false,
+    },
   });
 
-  return refund;
+  await prisma.refund.create({
+    data: {
+      paymentId: payment.id,
+      bookingId,
+      amount: payment.paymentAmount,
+      reason,
+      status: 'PENDING',
+      refundMethod: 'PAYFAST',
+      payfastRefundId,
+    },
+  });
+
+  return {
+    success: true,
+    message: 'Refund initiated. Check PayFast merchant portal if manual processing is required.',
+    refundAmount: payment.paymentAmount,
+  };
 };
 
-const getCustomerSavedCardsFromPaystack = async (userId: string) => {
-  const userData = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { paystackCustomerCode: true, role: true },
+// Get payment status
+const getPaymentStatus = async (bookingId: string) => {
+  const payment = await prisma.payment.findUnique({
+    where: { bookingId },
+    include: {
+      booking: {
+        select: {
+          bookingStatus: true,
+          totalPrice: true,
+        },
+      },
+    },
   });
 
-  if (!userData || !userData.paystackCustomerCode) {
-    return { message: 'User data or customer code not found' };
+  if (!payment) {
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Payment not found');
   }
 
-  if (userData.role !== UserRole.USER) {
-    throw new ApiError(httpStatus.FORBIDDEN, 'Only USERs can view saved cards');
-  }
-
-  const payments = await prisma.payment.findMany({
-    where: { paystackCustomerCodeProvider: userData.paystackCustomerCode },
-    select: { authorizationCode: true },
-  });
-
-  return { paymentMethods: payments.map(p => ({ authorization_code: p.authorizationCode })) };
+  return {
+    paymentId: payment.paymentId,
+    status: payment.status,
+    amount: payment.paymentAmount,
+    bookingStatus: payment.booking.bookingStatus,
+    createdAt: payment.createdAt
+  };
 };
 
-const deleteCardFromCustomer = async (authorizationCode:any, userId:string) => {
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { role: true, paystackCustomerCode: true },
-  });
-
-  if (!user || user.role !== UserRole.USER) {
-    throw new ApiError(httpStatus.FORBIDDEN, 'Only USERs can delete cards');
-  }
-
-  try {
-    await paystackRequest('post', '/customer/deactivate_authorization', {
-      authorization_code: authorizationCode,
-    });
-
-    await prisma.payment.updateMany({
-      where: { authorizationCode, paystackCustomerCodeProvider: user.paystackCustomerCode },
-      data: { status: PaymentStatus.DEACTIVATED },
-    });
-
-    return { message: 'Card deactivated successfully' };
-  } catch (error: any) {
-    throw new ApiError(httpStatus.CONFLICT, error.message);
-  }
+// Verify payment signature
+const verifyPaymentSignature = async (payload: Record<string, any>, signature: string) => {
+  const { signature: _, ...dataWithoutSignature } = payload;
+  return verifyPayFastSignature(dataWithoutSignature, signature, PAYFAST_PASSPHRASE);
 };
 
 export const paymentService = {
-  paystackRequest,
-  saveCardWithCustomerInfoIntoPaystack,
-  authorizedPaymentWithSaveCardFromPaystack,
+  createPayfastSubMerchant,
+  authorizedPaymentWithHoldFromPayfast,
+  handlePayfastNotification,
   requestCompletion,
-  confirmCompletionAndCapturePayment,
+  confirmCompletionAndReleasePayment,
   refundPaymentToCustomer,
-  createAccountIntoPaystack,
-  createNewAccountIntoPaystack,
-  getCustomerSavedCardsFromPaystack,
-  deleteCardFromCustomer,
+  getPaymentStatus,
+  verifyPaymentSignature,
+  generatePayFastSignature,
+  verifyPayFastSignature,
 };

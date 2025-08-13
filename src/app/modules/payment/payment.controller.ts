@@ -1,44 +1,47 @@
+import { Request, Response } from 'express';
 import httpStatus from 'http-status';
-import  catchAsync  from '../../../shared/catchAsync';
-import  sendResponse  from '../../../shared/sendResponse';
+import catchAsync from '../../../shared/catchAsync';
+import sendResponse from '../../../shared/sendResponse';
 import { paymentService } from './payment.service';
 import ApiError from '../../../errors/ApiErrors';
 
-// Save a USER's card and customer info
-const saveCard = catchAsync(async (req, res) => {
-    const payload = req.body;
-    const user = req.user;
-    const result = await paymentService.saveCardWithCustomerInfoIntoPaystack(payload, user);
-    sendResponse(res, {
-    statusCode: httpStatus.OK,
-    success: true,
-    message: 'Card saved successfully',
-    data: result,
-  });
-});
+// Initialize payment with hold
+const initializePayment = catchAsync(async (req: Request, res: Response) => {
+  const userId = req.user?.id;
+  const result = await paymentService.authorizedPaymentWithHoldFromPayfast(userId, req.body);
 
-// Authorize a payment for a booking (USER)
-const authorizePayment = catchAsync(async (req, res) => {
-  const { bookingId } = req.body;
-  if (!bookingId) {
-    throw new ApiError(httpStatus.BAD_REQUEST, 'Booking ID is required');
-  }
-  const result = await paymentService.authorizedPaymentWithSaveCardFromPaystack(req.user.id, req.body);
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
-    message: 'Payment authorized successfully',
+    message: 'Payment initialized successfully',
     data: result,
   });
 });
 
-// PROFESSIONAL requests booking completion
-const requestCompletion = catchAsync(async (req, res) => {
-  const { bookingId } = req.body;
-  if (!bookingId) {
-    throw new ApiError(httpStatus.BAD_REQUEST, 'Booking ID is required');
+// Handle PayFast ITN (Instant Transaction Notification)
+const handlePayFastNotification = catchAsync(async (req: Request, res: Response) => {
+  try {
+    // PayFast sends data as form-encoded, so we need to handle it properly
+    const notificationData = req.body;
+    
+    console.log('PayFast ITN received:', notificationData);
+    
+    const result = await paymentService.handlePayfastNotification(notificationData);
+    
+    // PayFast expects a 200 OK response for successful processing
+    res.status(httpStatus.OK).send('OK');
+  } catch (error: any) {
+    console.error('PayFast ITN processing error:', error);
+    // Still send OK to PayFast to prevent retries of invalid notifications
+    res.status(httpStatus.OK).send('OK');
   }
-  const result = await paymentService.requestCompletion(req.user.id, req.body);
+});
+
+// Request completion by professional
+const requestCompletion = catchAsync(async (req: Request, res: Response) => {
+  const userId = req.user?.id;
+  const result = await paymentService.requestCompletion(userId, req.body);
+
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
@@ -47,118 +50,92 @@ const requestCompletion = catchAsync(async (req, res) => {
   });
 });
 
-// USER confirms completion and captures payment
-const confirmCompletion = catchAsync(async (req, res) => {
-  const { bookingId } = req.body;
-  if (!bookingId) {
-    throw new ApiError(httpStatus.BAD_REQUEST, 'Booking ID is required');
-  }
-  const result = await paymentService.confirmCompletionAndCapturePayment(req.user.id, req.body);
+// Confirm completion and release payment
+const confirmCompletion = catchAsync(async (req: Request, res: Response) => {
+  const userId = req.user?.id;
+  const result = await paymentService.confirmCompletionAndReleasePayment(userId, req.body);
+
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
-    message: 'Booking completed and payment captured successfully',
+    message: 'Payment released successfully',
     data: result,
   });
 });
 
-// ADMIN refunds a payment
-const refundPayment = catchAsync(async (req, res) => {
-  const { bookingId } = req.body;
-  if (!bookingId) {
-    throw new ApiError(httpStatus.BAD_REQUEST, 'Booking ID is required');
-  }
+// Refund payment
+const refundPayment = catchAsync(async (req: Request, res: Response) => {
   const result = await paymentService.refundPaymentToCustomer(req.body);
+
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
-    message: 'Payment refunded successfully',
+    message: 'Refund initiated successfully',
     data: result,
   });
 });
 
+// Get payment status
+const getPaymentStatus = catchAsync(async (req: Request, res: Response) => {
+  const { bookingId } = req.params;
+  const result = await paymentService.getPaymentStatus(bookingId);
 
-
-// ADMIN creates a subaccount for a PROFESSIONAL
-const createAccount = catchAsync(async (req, res) => {
-  const userId = req.user.id as any;
-    const { account_number, bank_code } = req.body;
-    console.log("userId", userId);
-    console.log("account_number", account_number);
-    console.log("bank_code", bank_code);
-    const result = await paymentService.createAccountIntoPaystack(userId, { account_number, bank_code });
-    res.status(httpStatus.OK).json({
-      success: true,
-      data: result,
-      message: 'Subaccount created successfully',
-    });
-});
-
-// ADMIN creates a new subaccount, replacing the existing one
-const createNewAccount = catchAsync(async (req, res) => {
-  const { userId } = req.params;
-    const { account_number, bank_code } = req.body;
-    console.log("userId", userId);
-    console.log("account_number", account_number);
-    console.log("bank_code", bank_code);
-    const result = await paymentService.createNewAccountIntoPaystack(userId, { account_number, bank_code });
-    res.status(httpStatus.OK).json({
-      success: true,
-      data: result,
-      message: 'New subAccount created successfully',
-    });
-  })
-
-// USER retrieves saved cards
-const getSavedCards = catchAsync(async (req, res) => {
-  const { userId } = req.params;
-  if (!userId) {
-    throw new ApiError(httpStatus.BAD_REQUEST, 'User ID is required');
-  }
-  const result = await paymentService.getCustomerSavedCardsFromPaystack(userId);
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
-    message: 'Saved cards retrieved successfully',
+    message: 'Payment status retrieved successfully',
     data: result,
   });
 });
 
-// USER deletes a saved card
-const deleteCard = catchAsync(async (req, res) => {
-  const { authorizationCode } = req.params;
-  if (!authorizationCode) {
-    throw new ApiError(httpStatus.BAD_REQUEST, 'Authorization code is required');
-  }
-  const result = await paymentService.deleteCardFromCustomer(authorizationCode, req.user.id);
+// Verify payment (for additional security checks)
+const verifyPayment = catchAsync(async (req: Request, res: Response) => {
+  const { signature, ...payloadData } = req.body;
+  
+  const isValid = await paymentService.verifyPaymentSignature(payloadData, signature);
+  
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
-    message: 'Card deleted successfully',
-    data: result,
+    message: isValid ? 'Payment signature is valid' : 'Payment signature is invalid',
+    data: { isValid },
   });
 });
 
-// Fetch Paystack bank codes
-const getBanks = catchAsync(async (req, res) => {
-  const banks = await paymentService.paystackRequest('get', '/bank');
-  sendResponse(res, {
-    statusCode: httpStatus.OK,
-    success: true,
-    message: 'Bank codes retrieved successfully',
-    data: banks,
-  });
+// Handle payment success return from PayFast
+const handlePaymentReturn = catchAsync(async (req: Request, res: Response) => {
+  // This endpoint handles users returning from PayFast after payment
+  // You can extract payment details and redirect appropriately
+  const { m_payment_id, payment_status } = req.query;
+  
+  console.log('Payment return:', { m_payment_id, payment_status });
+  
+  // Redirect to frontend with payment status
+  const redirectUrl = payment_status === 'COMPLETE' 
+    ? `${process.env.FRONTEND_BASE_URL}/payment-success?booking=${m_payment_id}`
+    : `${process.env.FRONTEND_BASE_URL}/payment-failed?booking=${m_payment_id}`;
+    
+  res.redirect(redirectUrl);
+});
+
+// Handle payment cancellation
+const handlePaymentCancel = catchAsync(async (req: Request, res: Response) => {
+  const { m_payment_id } = req.query;
+  
+  console.log('Payment cancelled:', { m_payment_id });
+  
+  // Redirect to frontend
+  res.redirect(`${process.env.FRONTEND_BASE_URL}/payment-cancelled?booking=${m_payment_id}`);
 });
 
 export const paymentController = {
-  saveCard,
-  authorizePayment,
+  initializePayment,
+  handlePayFastNotification,
   requestCompletion,
   confirmCompletion,
   refundPayment,
-  createAccount,
-  createNewAccount,
-  getSavedCards,
-  deleteCard,
-  getBanks
+  getPaymentStatus,
+  verifyPayment,
+  handlePaymentReturn,
+  handlePaymentCancel,
 };
