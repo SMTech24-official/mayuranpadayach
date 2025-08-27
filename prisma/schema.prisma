@@ -52,6 +52,7 @@ model User {
   @@map("users")
 }
 
+
 model Category {
   id          String   @id @default(auto()) @map("_id") @db.ObjectId
   name        String
@@ -100,8 +101,9 @@ model Business {
   latitude    Float?   @default(0)
   longitude   Float?   @default(0)
   address     String?  @default("")
-  openingHours String
-  closingHours String
+  openingHours String  @default("")
+  closingHours String  @default("")
+  opining     OpenningsMap[] @relation("BusinessOpennings")
   status      BusinessStatus @default(ACTIVE)
   openStatus  BusinessTimeStatus @default(OPEN)
   userId      String   @db.ObjectId
@@ -120,6 +122,19 @@ model Business {
   portfolios  Portfolio[] @relation("BusinessPortfolios")
   favorites   Favorite[] @relation("BusinessFavorites")
   @@map("businesses")
+}
+
+model OpenningsMap{
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  businessId  String   @db.ObjectId
+  dayName    String
+  openingHours String
+  closingHours String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  business    Business @relation("BusinessOpennings", fields: [businessId], references: [id])
+  @@map("openningsMaps")
 }
 
 model Service {

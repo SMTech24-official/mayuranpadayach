@@ -16,6 +16,11 @@ fileUploader.uploadSingle,
 businessController.createBusiness,
 );
 
+router.post('/opennings/:businessId',auth(UserRole.PROFESSIONAL),businessController.createOppenningsMap);
+
+router.get('/opennings/:businessId',auth(),businessController.getOpenningMap);
+
+
 router.get('/', auth(), businessController.getBusinessList);
 
 router.get('/admin', auth(UserRole.ADMIN), businessController.getListForAdmin);
@@ -25,13 +30,14 @@ router.get('/user', auth(UserRole.PROFESSIONAL), businessController.getOneByUser
 router.get('/:id', auth(), businessController.getBusinessById);
 
 router.put(
-'/:id',
-auth(UserRole.ADMIN, UserRole.PROFESSIONAL),
-fileUploader.uploadSingle,
-//validateRequest(businessValidation.updateSchema),
-businessController.updateBusiness,
+    '/:id',
+    auth(UserRole.ADMIN, UserRole.PROFESSIONAL),
+    fileUploader.uploadSingle,
+    //validateRequest(businessValidation.updateSchema),
+    businessController.updateBusiness,
 );
 
+router.put('/opennings/:businessId',auth(UserRole.PROFESSIONAL),businessController.updateOpenningMap);
 router.delete('/:id', auth(UserRole.ADMIN), businessController.deleteBusiness);
 
 export const businessRoutes = router;

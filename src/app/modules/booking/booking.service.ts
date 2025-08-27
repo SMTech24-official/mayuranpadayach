@@ -3,8 +3,7 @@ import ApiError from "../../../errors/ApiErrors";
 import prisma from "../../../shared/prisma";
 import { IPaginationOptions } from "../../../interfaces/paginations";
 import { paginationHelper } from "../../../helpars/paginationHelper";
-import e from "express";
-import { UserStatus } from "@prisma/client";
+import cron from 'node-cron';
 
 
 const getTimeSlotsFromDb = async (serviceId: string, startTime?: Date, endTime?: Date) => {
@@ -391,6 +390,29 @@ const deleteItemFromDb = async (id: string) => {
     });
   return transaction;
 };
+
+
+//make node-cron daily when booking is created. the status will update when bookingDate is over
+// Runs every day at midnight
+cron.schedule('0 0 * * *', async () => {
+  console.log('Running scheduled task to update booking statuses...');
+  const now = new Date();
+  const bookings = await prisma.booking.findMany({
+    where: {
+      bookingDate: {
+        lt: now,
+      },
+      bookingStatus: 'PENDING',
+    },
+  });
+
+  for (const booking of bookings) {
+    await prisma.booking.update({
+      where: { id: booking.id },
+      data: { bookingStatus: 'COMPLETED' },
+    });
+  }
+});
 
 export const bookingService = {
 createIntoDb,

@@ -80,6 +80,44 @@ const deleteBusiness = catchAsync(async (req, res) => {
   });
 });
 
+//create Oppennings map
+const createOppenningsMap = catchAsync(async (req, res) => {
+  const businessId = req.params.businessId;
+  const opennings = req.body;
+  const result = await businessService.createOpenningsMap(businessId, opennings);
+  sendResponse(res, {
+    statusCode: httpStatus.CREATED,
+    success: true,
+    message: 'Openning map created successfully',
+    data: result,
+  });
+});
+
+//get openning map
+const getOpenningMap = catchAsync(async (req, res) => {
+  const businessId = req.params.businessId;
+  const result = await businessService.getOpenningMap(businessId);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Openning map retrieved successfully',
+    data: result,
+  });
+});
+
+//update openning map
+const updateOpenningMap = catchAsync(async (req, res) => {
+  const businessId = req.params.businessId;
+  const opennings = req.body;
+  const result = await businessService.updateOpenningMap(businessId, opennings);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Openning map updated successfully',
+    data: result,
+  });
+});
+
 export const businessController = {
   createBusiness,
   getBusinessList,
@@ -88,4 +126,7 @@ export const businessController = {
   getOneByUserId,
   updateBusiness,
   deleteBusiness,
+  createOppenningsMap,
+  getOpenningMap,
+  updateOpenningMap
 };

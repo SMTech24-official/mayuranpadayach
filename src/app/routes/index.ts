@@ -15,7 +15,7 @@ import { reviewRoutes } from "../modules/review/review.routes";
 import { bookingRoutes } from "../modules/booking/booking.routes";
 import { searchHistoryRoutes } from "../modules/searchHistory/searchHistory.routes";
 import { NotificationRoutes } from "../modules/notification/notification.routes";
-import { PaymentRoutes } from "../modules/payment/payment.routes";
+//import { PaymentRoutes } from "../modules/payment/payment.routes";
 
 
 
@@ -86,10 +86,10 @@ const moduleRoutes = [
     path: "/notifications",  
     route: NotificationRoutes,
   },
-  {
-    path: "/payment",  
-    route: PaymentRoutes,
-  }
+  // {
+  //   path: "/payment",  
+  //   route: PaymentRoutes,
+  // }
 ];
 
 moduleRoutes.forEach((route) => router.use(route.path, route.route));

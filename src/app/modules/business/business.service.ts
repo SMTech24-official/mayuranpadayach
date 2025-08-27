@@ -383,9 +383,82 @@ const deleteItemFromDb = async (id: string) => {
   return transaction;
 };
 
+// Define the OpenningsMap interface if not already defined or import it from the correct module
+interface OpenningsMap {
+  dayName: string;
+  openingHours: string;
+  closingHours: string;
+}
+
+export const createOpenningsMap = async (
+  businessId: string,
+  opennings: OpenningsMap[]
+) => {
+  return await prisma.$transaction(async (tx) => {
+    const created = await tx.openningsMap.createMany({
+      data: opennings.map((opening) => ({
+        businessId,
+        dayName: opening.dayName,
+        openingHours: opening.openingHours === "Closed" ? "" : opening.openingHours,
+        closingHours: opening.closingHours === "Closed" ? "" : opening.closingHours,
+      })),
+    });
+    return created;
+  });
+};
+
+const getOpenningMap = async (businessId: string) => {
+  const transaction = await prisma.$transaction(async (prisma) => {
+    const existingBusiness = await prisma.business.findUnique({
+      where: { id: businessId },
+    });
+    if (!existingBusiness) {
+      throw new ApiError(httpStatus.NOT_FOUND, 'Business not found');
+    }
+    const opennings = await prisma.openningsMap.findMany({
+      where: { businessId: existingBusiness.id },
+    });
+    return opennings;
+  });
+
+  return transaction;
+};
+
+const updateOpenningMap = async (businessId: string, opennings: OpenningsMap[]) => {
+  return await prisma.$transaction(async (tx) => {
+    const existingBusiness = await tx.business.findUnique({
+      where: { id: businessId },
+    });
+    if (!existingBusiness) {
+      throw new ApiError(httpStatus.NOT_FOUND, 'Business not found');
+    }
+
+    // Remove old opennings
+    await tx.openningsMap.deleteMany({
+      where: { businessId: existingBusiness.id },
+    });
+
+    // Insert new ones
+    const updated = await tx.openningsMap.createMany({
+      data: opennings.map((opening) => ({
+        businessId,
+        dayName: opening.dayName,
+        openingHours: opening.openingHours === "Closed" ? "" : opening.openingHours,
+        closingHours: opening.closingHours === "Closed" ? "" : opening.closingHours,
+      })),
+    });
+
+    return updated;
+  });
+};
+
+
 export const businessService = {
 createIntoDb,
+createOpenningsMap,
 getListFromDb,
+getOpenningMap,
+updateOpenningMap,
 getListForAdminFromDb,
 getByIdFromDb,
 getOneByUserIdFromDb,
